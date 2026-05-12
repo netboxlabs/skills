@@ -1,0 +1,15 @@
+{
+  "$schema": "https://cursor.com/schemas/marketplace.json",
+  "name": "netbox-labs",
+  "owner": {
+    "name": "NetBox Labs",
+    "url": "https://netboxlabs.com"
+  },
+  "plugins": [
+    {
+      "name": "netbox-labs",
+      "source": "./",
+      "description": "Skills for the NetBox ecosystem — data modeling, API integration, plugin development, change management, discovery, assurance, automation, and migration."
+    }
+  ]
+}
