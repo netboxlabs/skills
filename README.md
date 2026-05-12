@@ -68,13 +68,13 @@ npx skills add netboxlabs/skills
 | Server | Access | Status | Link |
 |--------|--------|--------|------|
 | `netbox-mcp-server` | Read-only (OSS) | Available | [GitHub](https://github.com/netboxlabs/netbox-mcp-server) |
-| `nbl-mcp-platform` | Full CRUD (Commercial) | Coming soon | — |
+| NetBox Labs Platform MCP Server | Full CRUD (Commercial) | Coming soon | — |
 
 Run `/setup-mcp` to configure MCP server access for your agent.
 
 ## Resources
 
-- [NetBox Documentation](https://docs.netbox.dev)
+- [NetBox Documentation](https://netboxlabs.com/docs/netbox/)
 - [NetBox GitHub](https://github.com/netbox-community/netbox)
 - [NetBox Labs](https://netboxlabs.com)
 - [Agent Skills Spec](https://agentskills.io)

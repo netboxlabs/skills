@@ -58,7 +58,7 @@ After adding, test with:
 
 ## Cloud / Enterprise Edition
 
-Use `nbl-mcp-platform` — the commercial MCP server with full CRUD access, branching support, and enterprise auth.
+Use the NetBox Labs Platform MCP Server — the commercial MCP server with full CRUD access, branching support, and enterprise auth.
 
 **Status:** Coming soon. Contact NetBox Labs for early access.
 
