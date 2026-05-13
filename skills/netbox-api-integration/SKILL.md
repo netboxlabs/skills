@@ -179,8 +179,6 @@ See [references/performance.md](references/performance.md) for async pagination,
 
 ## Data Modeling
 
-<!-- TODO: Extract to netbox-data-modeling skill -->
-
 ### Dependency Order
 
 Objects must be created in order: Organization → Sites → DCIM Prerequisites → Racks → Devices → IPAM → Virtualization → Circuits → Connections.
@@ -217,8 +215,6 @@ device.save()  # Uses PATCH
 
 ### Diode (Data Ingestion)
 
-<!-- TODO: Extract to netbox-diode skill -->
-
 For bulk ingestion, use [Diode](https://github.com/netboxlabs/diode) instead of direct API. Specify dependencies by name — Diode resolves or creates them automatically. No dependency ordering needed.
 
 ```python
@@ -246,8 +242,6 @@ Configure NetBox to push changes via webhooks. Always verify the `X-Hook-Signatu
 Query `extras.object_changes` for audit trails — includes timestamp, action, user, and before/after data.
 
 ## Branching (Plugin)
-
-<!-- TODO: Extract to netbox-branching skill -->
 
 > Requires [netbox-branching](https://github.com/netboxlabs/netbox-branching) plugin.
 

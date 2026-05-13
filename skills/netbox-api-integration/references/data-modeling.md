@@ -1,5 +1,3 @@
-<!-- TODO: Extract to netbox-data-modeling skill -->
-
 # Data Modeling
 
 Reference for NetBox data model patterns: dependency order, hierarchies, custom fields, tags, tenants, and natural keys.

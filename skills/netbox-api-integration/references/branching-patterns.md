@@ -1,5 +1,3 @@
-<!-- TODO: Extract to netbox-branching skill -->
-
 # Branching Patterns
 
 Reference for the [netbox-branching](https://github.com/netboxlabs/netbox-branching) plugin API: lifecycle, context headers, and async operations.

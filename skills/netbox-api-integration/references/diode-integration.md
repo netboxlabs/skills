@@ -1,5 +1,3 @@
-<!-- TODO: Extract to netbox-diode skill -->
-
 # Diode Integration
 
 Reference for using [Diode](https://github.com/netboxlabs/diode) for high-volume data ingestion into NetBox.

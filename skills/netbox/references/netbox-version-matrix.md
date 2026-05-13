@@ -23,11 +23,13 @@ Quick reference for version-dependent features across the platform.
 |---------|---------------|-------|
 | NetBox Branching | 4.2+ | Requires PostgreSQL schema support |
 | NetBox Changes | 4.2+ | Pairs with Branching |
+| NetBox Custom Objects | 4.4+ | No-code data model extensibility |
+| NetBox Validation | 4.2+ | Policy-based compliance checks |
 | Diode | 4.2.3+ | gRPC ingestion service |
 | Orb Agent (Discovery) | 4.2+ | Via Diode |
 | NetBox Assurance | 4.2+ | Via Diode reconciler |
-| Platform MCP Server | 4.5+ | v2 tokens required |
-| NetBox Cloud | Always latest | Managed by NBL |
+| netbox-mcp-server | 4.5+ | v2 tokens required |
+| NetBox Cloud | Always latest | Managed by NetBox Labs |
 
 ## SDK Versions
 
