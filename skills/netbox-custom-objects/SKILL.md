@@ -30,6 +30,8 @@ curl -s -H "Authorization: Bearer $NETBOX_TOKEN" "$NETBOX_URL/api/plugins/custom
 
 If you get 404, the plugin is not installed. If 403, your token needs `custom_objects` permissions.
 
+> **Version note:** this skill targets plugin **v0.5.x** (latest v0.5.1), which requires **NetBox 4.5.2+** (through 4.6.x). v0.5 changed several behaviors vs v0.4.x — cross-COT references, API validation, and branching — these are flagged inline below.
+
 ---
 
 Extend the NetBox data model without writing code. Custom Objects let administrators define new object types with typed fields, validation rules, and relationships — all through the UI or API.
@@ -177,7 +179,7 @@ Common `app_label.model` combinations:
 
 ### Referencing Other Custom Objects
 
-Use `app_label: "netbox_custom_objects"` and `model` set to `table{id}model` where `{id}` is the target COT's database ID:
+Set `app_label` to `"custom-objects"` and `model` to the **target COT's slug**:
 
 ```json
 {
@@ -185,16 +187,38 @@ Use `app_label: "netbox_custom_objects"` and `model` set to `table{id}model` whe
   "name": "parent_scope",
   "label": "Parent Scope",
   "type": "object",
-  "app_label": "netbox_custom_objects",
-  "model": "table1model"
+  "app_label": "custom-objects",
+  "model": "dhcp-scopes"
 }
 ```
 
-To find the model name, look up the target COT's `id` from the API and construct `table{id}model`.
-
-> **Note:** The upstream docs suggest `app_label: "custom-objects"` with the COT name as model — this does not work in practice. The internal model name (`table{id}model`) is required.
+> **Plugin v0.5+**: the `"custom-objects"` + slug form is the supported way to reference another COT. (Older builds required an internal `table{id}model` name; do not use that against v0.5+.)
 
 > **Self-referential fields** (a COT pointing to itself) are allowed. Circular references between different COTs are detected and blocked.
+
+### Polymorphic Reference Fields
+
+> **Plugin v0.5+**: an `object`/`multiobject` field can reference **multiple** object types. Set `is_polymorphic: true` and provide the allowed types via `related_object_types_input` instead of `app_label`/`model`:
+
+```json
+{
+  "custom_object_type": 9,
+  "name": "linked_resource",
+  "label": "Linked Resource",
+  "type": "object",
+  "is_polymorphic": true,
+  "related_object_types_input": [
+    {"app_label": "dcim", "model": "device"},
+    {"app_label": "custom-objects", "model": "servers"}
+  ]
+}
+```
+
+When writing an instance value for a polymorphic field, pass a dict identifying the type and object: `{"app_label": "dcim", "model": "device", "object_id": 7}` (`content_type_id` and `id` are accepted aliases). The `is_polymorphic` flag and allowed types are immutable after the field is created.
+
+### Object-Deletion Behavior
+
+> **Plugin v0.5+**: `object` fields take an `on_delete_behavior` of `"set_null"` (default), `"cascade"`, or `"protect"`, controlling what happens to the custom object when a referenced object is deleted. Use `related_name` to set the reverse-accessor name for ORM lookups.
 
 ### Filtering Object Selections
 
@@ -258,11 +282,12 @@ The generated model supports the full Django ORM (filter, create, update, delete
 
 ## Branching Compatibility
 
-Custom Objects is compatible with NetBox Branching but with limitations:
+Custom Objects is compatible with NetBox Branching but with limitations. **The two layers behave differently** — don't conflate them:
 
-- **Type and field definitions** (COT/COTF) always apply to main — changes are not branch-scoped
-- **Custom object instances** also bypass branch isolation — creates and updates go directly to main, not into the branch diff
-- In effect, the entire Custom Objects plugin operates on main regardless of the active branch
+- **Type and field definitions** (COT/COTF): writable while a branch is active, but changes apply **directly to main** — they do not appear in the branch diff or "Changes Ahead" view.
+- **Custom object instances**: writes on a branch are **disallowed** (plugin v0.5+). In an active branch you can still read existing instances, but you **cannot create, edit, or delete** custom objects until the branch is merged/exited. (Do not assume instance writes silently land on main — they are rejected.)
+
+To move COT/COTF schemas between instances or promote branch-developed schemas, use the **portable schema** export/apply feature rather than editing on a branch.
 
 **Required configuration** when using with Branching:
 
@@ -293,12 +318,13 @@ Every custom object automatically gets:
 1. **Deletion is destructive**: Deleting a COT drops the entire database table. Deleting a COTF drops the column. Both are irreversible.
 2. **No GraphQL support** yet — REST API only.
 3. **No bulk create** — the instance API does not accept arrays. Create instances one at a time.
-4. **Field validation is UI-only** (as of v0.4.x): `required`, `validation_regex`, `validation_minimum`, and `validation_maximum` are enforced in the web UI but **not via the REST API**. API consumers must validate data before submission. This is a known plugin limitation.
+4. **Field validation is enforced on API writes** (plugin v0.5+): `required`, `validation_regex`, `validation_minimum`, and `validation_maximum` are now applied on REST API writes as well as the UI. NetBox's `CUSTOM_VALIDATORS` setting is also honored — key it as `netbox_custom_objects.<cot-slug>`. (In v0.4.x these were UI-only; do not rely on that against v0.5+.)
 5. **Max types**: Default limit of 50 custom object types (configurable via `max_custom_object_types`).
 6. **Reserved field names**: ~30 names are reserved (e.g., `id`, `tags`, `created`, `last_updated`, `model`, `objects`, `pk`, `save`, `delete`). The API returns a clear error if you try to use one.
 7. **Uniqueness constraints**: Cannot be enforced on `boolean` or `multiobject` fields.
 8. **Name format**: COT names and COTF names must be lowercase alphanumeric with underscores. No double underscores.
-9. **Cross-COT references use internal model names**: Referencing another COT requires `app_label: "netbox_custom_objects"` and `model: "table{id}model"` — not the COT name.
+9. **Cross-COT references use the COT slug** (plugin v0.5+): `app_label: "custom-objects"` + `model: "<target-slug>"`. Polymorphic fields reference multiple types via `related_object_types_input`.
+10. **Minimum NetBox version**: plugin v0.5.x requires **NetBox 4.5.2+** (through 4.6.x). Installs on 4.4.x / 4.5.0 / 4.5.1 are not supported by current releases.
 
 ## Common Patterns
 

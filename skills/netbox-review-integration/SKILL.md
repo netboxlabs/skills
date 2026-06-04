@@ -44,6 +44,7 @@ Follow this checklist when reviewing NetBox integration code:
 | AUTH-2 | Never hardcode tokens in source — use env vars or secrets manager | Critical |
 | AUTH-3 | Use `Bearer` prefix in Authorization header (not `Token` on 4.5+) | High |
 | AUTH-4 | Verify token has required permissions for all accessed endpoints | Medium |
+| AUTH-5 | Flag reliance on v1 (`Token <plaintext>`) tokens — deprecated in 4.6, **removed in v5.0**; migrate to v2. On 4.6.1+ the v2 plaintext is shown once at creation, so capture it then | High |
 
 ### Pagination (PAG)
 
@@ -54,6 +55,7 @@ Follow this checklist when reviewing NetBox integration code:
 | PAG-3 | Set explicit `limit` parameter — don't rely on server default (50) | Medium |
 | PAG-4 | GraphQL queries MUST include `pagination: {limit: N}` at every list level | Critical |
 | PAG-5 | Nested GraphQL lists need their own pagination parameters | High |
+| PAG-6 | Prefer cursor pagination over deep offsets for large reads — REST `?start=<id>` (4.6+), GraphQL `pagination: {start: N, limit: M}` (4.5.2+); flag deep `?offset=` scans | Medium |
 
 ### Performance (PERF)
 
@@ -86,6 +88,8 @@ Follow this checklist when reviewing NetBox integration code:
 | DATA-3 | Use natural keys (slug/name) for readability but be aware of uniqueness constraints | Medium |
 | DATA-4 | Validate dependency order for REST creates (parent before child) | High |
 | DATA-5 | IPAddress values MUST include CIDR prefix length (`/24`, not bare IP) | High |
+| DATA-6 | For tag edits, prefer write-only `add_tags`/`remove_tags` (4.6+) over read-modify-write of the full `tags` list — the latter clobbers concurrent writers' tags | Medium |
+| DATA-7 | For read-modify-write on a single object under concurrency, use ETag + `If-Match` (4.6+); a 412 response means the object changed — re-fetch and retry rather than blind overwrite | Medium |
 
 ## Anti-Patterns to Flag
 
@@ -99,7 +103,7 @@ Follow this checklist when reviewing NetBox integration code:
 | Ignoring `config_context` in list queries | 10-100x slower responses | Add `?exclude=config_context` |
 | Catching bare `Exception` on API calls | Hides real errors | Catch `requests.HTTPError` specifically |
 | No timeout on HTTP requests | Hangs indefinitely on network issues | Set `timeout=30` |
-| GraphQL without pagination params | Returns default 50, silently truncates | Always pass `pagination: {limit: N}` |
+| GraphQL without pagination params | Omitting `pagination` returns **all** rows; `pagination` without `limit` returns Strawberry's default **100** (not the REST default of 50) — both silently differ from expectations | Always pass `pagination: {limit: N}` explicitly |
 | Polling branch jobs without backoff | Wastes API calls, may trigger rate limits | Exponential backoff (1s → 30s) |
 
 ## Scope

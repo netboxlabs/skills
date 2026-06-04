@@ -6,21 +6,24 @@ Complete YAML schema for `agent.yaml`. All configuration lives under the top-lev
 
 ```yaml
 orb:
+  labels:                  # top-level agent labels — used for git selector matching
+    region: us-east
+    env: production
+
   config_manager:
-    active: local | git
-    # Git-specific options (when active: git)
-    git:
-      repo: https://github.com/org/policies.git
-      branch: main
-      auth:
-        type: basic | ssh
-        username: user
-        password: pass
-        # or ssh_key_path for SSH
-      schedule: "*/5 * * * *"   # Poll interval
+    active: local          # local | git | fleet
+    sources:
+      git:                 # used when active: git
+        url: https://github.com/org/policies.git   # NOT "repo:"
+        branch: main
+        auth: basic        # a STRING: basic | ssh (NOT auth.type)
+        username: user     # basic auth
+        password: ${GIT_TOKEN}
+        private_key: /opt/orb/id_ed25519   # ssh auth (NOT auth.ssh_key_path)
+        skip_tls: false
 
   secrets_manager:
-    active: vault
+    active: vault          # vault | doppler | cyberark | delinea
     sources:
       vault:
         address: "https://vault.example.com:8200"
@@ -34,8 +37,8 @@ orb:
         username: xxx             # For userpass/ldap
         password: xxx
         role: xxx                 # For kubernetes
-      namespace: optional/namespace
-      schedule: "0 * * * *"       # Secret refresh interval
+      # doppler / cyberark (CCP, beta) / delinea (Secret Server, beta) are also
+      # valid sources — see "Secret References" below for their reference syntaxes.
 
   backends:
     common:
@@ -72,36 +75,56 @@ orb:
 
 ## Secret References
 
-Environment variables and Vault secrets can be used anywhere in the config:
+Environment variables and secrets-manager references can be used anywhere in the config:
 
 ```yaml
 # Environment variable
 password: ${MY_ENV_VAR}
 
-# Vault secret
+# HashiCorp Vault
 password: ${vault://secret/data/network/credentials/admin_pass}
+
+# Doppler (short or qualified)
+password: ${doppler://CISCO_PASSWORD}
+password: ${doppler://orb/prd/CISCO_PASSWORD}
+
+# CyberArk CCP (beta)
+password: ${cyberark://Lab-DB/cisco-svc-account}
+username: ${cyberark://Lab-DB/cisco-svc-account/UserName}
+
+# Delinea Secret Server (beta)
+password: ${delinea://id/42/password}
+password: ${delinea://path/Servers/prod-db/password}
 ```
 
 ## Git Config Manager — selector.yaml
 
-The Git repo must contain a `selector.yaml` at the root:
+The Git repo must contain a `selector.yaml` at the root. It is a **map of named
+selector blocks** — each has a `selector:` (key/value labels, matched against the
+agent's top-level `orb.labels`; an empty selector matches all agents) and a
+`policies:` map of named policy → file path:
 
 ```yaml
-selectors:
-  - match:
-      labels:
-        region: us-east
-    policies:
-      - policies/us-east-network.yaml
-      - policies/us-east-devices.yaml
-  - match:
-      labels:
-        env: production
-    policies:
-      - policies/production-snmp.yaml
+agent_selector_eu:
+  selector:                 # key/value labels directly (no "labels:" wrapper)
+    region: EU
+  policies:
+    network_policy:
+      path: policies/eu-network.yaml
+    snmp_policy:
+      path: policies/eu-snmp.yaml
+      enabled: true         # optional; set false to skip
+
+agent_selector_all:
+  selector: {}              # empty = match every agent
+  policies:
+    base_policy:
+      path: policies/base.yaml
 ```
 
-Agents are matched by their `agent_labels` to determine which policy files apply.
+Matching is against the agent's **top-level `orb.labels`** — NOT
+`backends.common.agent_labels` (those are telemetry labels applied to exported
+data only).
 
 ## Common Defaults Structure
 

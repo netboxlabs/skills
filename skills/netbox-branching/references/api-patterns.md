@@ -195,13 +195,11 @@ Read-only audit log of branch lifecycle events.
 
 ## Discover Branchable Models
 
-> **Note:** This endpoint is **not available in all versions** of netbox-branching (e.g., returns 404 on 0.8.x). See [branch-aware-models.md](branch-aware-models.md) for practical guidance on identifying branchable models.
-
 ```http
 GET /api/plugins/branching/branchable-models/
 ```
 
-When available, returns all models that support branching, with `app_label` and `model` fields.
+Returns all models that support branching, with `app_label` and `model` fields. Available across the supported 4.4.1+ / plugin 1.0.x range (older 0.8.x builds returned 404). See [branch-aware-models.md](branch-aware-models.md) for the practical heuristics.
 
 ## Required Permissions
 
@@ -209,6 +207,7 @@ When available, returns all models that support branching, with `app_label` and 
 |--------|-----------|
 | Sync | `netbox_branching.sync_branch` |
 | Merge | `netbox_branching.merge_branch` |
+| Migrate (v1.0+) | `netbox_branching.migrate_branch` |
 | Revert | `netbox_branching.revert_branch` |
 | Archive | `netbox_branching.archive_branch` |
 

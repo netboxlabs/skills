@@ -1,6 +1,8 @@
 # Diode Entity Type Catalog
 
-Complete list of entity types supported by the Diode SDK (NetBox v4.5.0). All types are available in both Python and Go SDKs.
+Complete list of entity types supported by the Diode SDK — **diode-sdk-python v1.12.0 / diode-sdk-go v1.9.0**, exposing **104 entity classes** and covering NetBox **4.5.x–4.6.x**. All types are available in both Python and Go SDKs.
+
+> **NetBox 4.6 models:** `CableBundle`, `RackGroup`, and `VirtualMachineType` are new in NetBox 4.6 — ingesting them lands correctly only against a NetBox 4.6 instance with a matching Diode plugin.
 
 ## Core Entity Types
 
@@ -27,9 +29,9 @@ These are the most commonly used entities. The **Primary Key** column shows the 
 
 ## All Entity Types by Category
 
-### DCIM (39 types)
+### DCIM (41 types)
 
-ASN, ASNRange, Cable, CablePath, CableTermination, ConsolePort, ConsoleServerPort, Device, DeviceBay, DeviceConfig, DeviceRole, DeviceType, FrontPort, Interface, InventoryItem, InventoryItemRole, Location, MACAddress, Manufacturer, Module, ModuleBay, ModuleType, ModuleTypeProfile, Platform, PowerFeed, PowerOutlet, PowerPanel, PowerPort, Rack, RackReservation, RackRole, RackType, RearPort, Region, Site, SiteGroup, VirtualChassis, VirtualDeviceContext
+ASN, ASNRange, Cable, **CableBundle** *(4.6)*, CablePath, CableTermination, ConsolePort, ConsoleServerPort, Device, DeviceBay, DeviceConfig, DeviceRole, DeviceType, FrontPort, Interface, InventoryItem, InventoryItemRole, Location, MACAddress, Manufacturer, Module, ModuleBay, ModuleType, ModuleTypeProfile, Platform, PowerFeed, PowerOutlet, PowerPanel, PowerPort, Rack, **RackGroup** *(4.6)*, RackReservation, RackRole, RackType, RearPort, Region, Site, SiteGroup, VirtualChassis, VirtualDeviceContext
 
 ### IPAM (15 types)
 
@@ -47,17 +49,17 @@ WirelessLAN, WirelessLANGroup, WirelessLink
 
 IKEPolicy, IKEProposal, IPSecPolicy, IPSecProfile, IPSecProposal, L2VPN, L2VPNTermination, Tunnel, TunnelGroup, TunnelTermination
 
-### Virtualization (6 types)
+### Virtualization (7 types)
 
-Cluster, ClusterGroup, ClusterType, VirtualDisk, VirtualMachine, VMInterface
+Cluster, ClusterGroup, ClusterType, VirtualDisk, VirtualMachine, **VirtualMachineType** *(4.6)*, VMInterface
 
 ### Tenancy (6 types)
 
 Contact, ContactAssignment, ContactGroup, ContactRole, Tenant, TenantGroup
 
-### Other (8 types)
+### Other (9 types)
 
-CustomField, CustomFieldChoiceSet, CustomLink, GenericObject, JournalEntry, Owner, OwnerGroup, Tag
+CustomField, CustomFieldChoiceSet, CustomLink, GenericObject, JournalEntry, Owner, OwnerGroup, **ScriptModule**, Tag
 
 ## String Shorthand Support (Python Only)
 

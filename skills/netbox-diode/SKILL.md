@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Diode is a gRPC-based data ingestion service for NetBox. Instead of managing dependency order and object IDs via the REST API, you describe objects by name and the Diode reconciler resolves dependencies, creates missing objects, and performs upserts automatically.
 
-**This skill covers the open-source Python and Go SDKs.** The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
+**This skill covers the open-source Python and Go SDKs** (diode-sdk-python v1.12.0 / diode-sdk-go v1.9.0), targeting NetBox **4.5.x–4.6.x**. The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
 
 > **Your knowledge of Diode SDK may be outdated.** Entity types, SDK methods, and reconciler behavior evolve between releases. Prefer retrieval over pre-trained knowledge.
 
@@ -123,7 +123,7 @@ with DiodeClient(
 ### Minimal Go Example
 
 ```go
-import diode "github.com/netboxlabs/diode-sdk-go"
+import diode "github.com/netboxlabs/diode-sdk-go/diode"  // exported types live in the diode/ subpackage
 
 client, err := diode.NewClient(
     "grpc://localhost:8080/diode",
@@ -272,7 +272,7 @@ except DiodeClientError as e:
 
 | File | When to Load |
 |------|-------------|
-| [references/entity-catalog.md](references/entity-catalog.md) | Need the full list of 99 entity types and their fields |
+| [references/entity-catalog.md](references/entity-catalog.md) | Need the full list of 104 entity types and their fields |
 | [references/python-sdk-guide.md](references/python-sdk-guide.md) | Building a Python integration — setup, patterns, examples |
 | [references/go-sdk-guide.md](references/go-sdk-guide.md) | Building a Go integration — setup, patterns, examples |
 | [references/ingestion-patterns.md](references/ingestion-patterns.md) | Advanced patterns: chunking, dry run, OTLP, metadata |

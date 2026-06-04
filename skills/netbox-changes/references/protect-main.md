@@ -23,13 +23,16 @@ PLUGINS_CONFIG = {
 When protect_main is enabled, every save or delete operation is checked:
 
 1. If the model is not branch-aware, the write is allowed
-2. If the user has the `netbox_changes.bypass_policy` permission, the write is allowed
+2. If the user has the **bypass** action on the Policy object, the write is allowed
 3. If an active branch context exists (`X-NetBox-Branch` header), the write is allowed
 4. Otherwise, the write is **blocked** with: `"Changes directly to main are not permitted."`
 
 ## Bypass Permission
 
-Permission: `netbox_changes.bypass_policy`
+**v1.0+:** grant the **`bypass`** custom action on the **Policy** object (NetBox
+Change Management → Policy in the ObjectPermission form). Superusers get it
+implicitly. Internally the codename is `bypass` while the enforcement check still
+references `bypass_policy` — describe it to users as "the bypass action on Policy."
 
 Users/roles with this permission can make direct changes to main even when
 protect_main is enabled. This is the **only custom permission** added by the

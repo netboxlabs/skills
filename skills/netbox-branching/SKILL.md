@@ -35,6 +35,10 @@ You should see a paginated list of branches (or empty results). If you get 404, 
 
 ---
 
+**Plugin:** `netbox_branching` 1.0.x (latest v1.0.3) · **NetBox:** 4.4.1–4.6
+
+> **Plugin v1.0+** added a dedicated **`migrate`** branch action/permission (for applying pending migrations after a NetBox upgrade) and ships the `branchable-models` discovery endpoint on all supported versions. Permission codenames, the merge `squash` strategy, and the 11-state lifecycle are stable across the 1.0.x line.
+
 ## Core Concepts
 
 - **Branch = isolated schema.** Created on provision, dropped on archive/delete. Each branch has its own database tables.
@@ -198,13 +202,13 @@ GET <job_url>
 
 Job `status` values: `pending`, `running`, `completed`, `errored`, `failed`. Wait for a terminal status. Use exponential backoff (start 1s, max 30s).
 
-**Permissions required:** `netbox_branching.sync_branch`, `netbox_branching.merge_branch`, `netbox_branching.revert_branch`, `netbox_branching.archive_branch`.
+**Permissions required:** `netbox_branching.sync_branch`, `netbox_branching.merge_branch`, `netbox_branching.revert_branch`, `netbox_branching.archive_branch`, and (v1.0+) `netbox_branching.migrate_branch` for applying pending migrations.
 
 ## Branch-Aware Models
 
 Most DCIM, IPAM, Circuits, Tenancy, Virtualization, VPN, and Wireless models support branching. **NOT branched** (global/immediate): custom fields, webhooks, event rules, export templates, saved filters, all `core.*` models.
 
-> **Note:** Some versions expose a `GET /api/plugins/branching/branchable-models/` discovery endpoint, but it is **not available in all versions** (e.g., returns 404 on 0.8.x). In practice, most core operational models (DCIM, IPAM, Circuits, etc.) are branched; infrastructure models (custom fields, webhooks, core.*) and plugin models are exempt.
+> **Discovery endpoint:** `GET /api/plugins/branching/branchable-models/` lists exactly which models are branched on your install — use it instead of guessing. (It was missing on some older 0.8.x builds but is present across the supported 4.4.1+ / plugin 1.0.x range.) In practice, most core operational models (DCIM, IPAM, Circuits, etc.) are branched; infrastructure models (custom fields, webhooks, core.*) and plugin models are exempt.
 
 See [references/branch-aware-models.md](references/branch-aware-models.md).
 
@@ -247,7 +251,7 @@ See the [netbox-changes skill](../netbox-changes/SKILL.md) for CR lifecycle deta
 | `POST .../branches/<id>/archive/` | Archive branch |
 | `GET /api/plugins/branching/changes/` | ChangeDiff records |
 | `GET /api/plugins/branching/branch-events/` | Branch event log |
-| `GET /api/plugins/branching/branchable-models/` | Discover branchable models (not available in all versions) |
+| `GET /api/plugins/branching/branchable-models/` | Discover branchable models |
 
 ## References
 

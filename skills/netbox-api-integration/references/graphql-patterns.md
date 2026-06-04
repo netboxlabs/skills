@@ -87,12 +87,23 @@ Offset pagination scans all rows up to the offset — performance degrades linea
 
 | Version | Approach |
 |---------|----------|
-| ≤ 4.4.x | Offset only (`limit` + `offset`) |
-| 4.5.x | ID range filtering workaround |
-| 4.5.8+ | Cursor-based pagination (`start` parameter) may be available |
-| 4.6.0+ | Full cursor-based pagination support |
+| ≤ 4.5.1 | Offset only, or the ID-range filtering workaround below |
+| 4.5.2+ | **Cursor-based pagination** — `pagination: {start: N, limit: M}` (GA) |
 
-**ID range pagination (4.5.x):**
+**Cursor pagination (4.5.2+, preferred):**
+
+```graphql
+query GetDevices($start: Int!, $limit: Int!) {
+  device_list(pagination: {start: $start, limit: $limit}) {
+    id
+    name
+  }
+}
+```
+
+Returns records with `id >= start`, always ordered by PK. For the next page, set `start` to the last record's `id` + 1. Omitting `start` falls back to offset pagination. This supersedes the ID-range workaround below (only needed pre-4.5.2).
+
+**ID range pagination (≤ 4.5.1 fallback):**
 
 ```graphql
 query GetDevicesAfter($lastId: ID!, $limit: Int!) {
@@ -118,9 +129,14 @@ def fetch_with_id_cursor(netbox_url, token, page_size=100):
     return all_results
 ```
 
-Caveats: inconsistent page sizes with ID gaps, must fetch `id` in every query, cannot jump to arbitrary pages.
+Caveats: inconsistent page sizes with ID gaps, must fetch `id` in every query, cannot jump to arbitrary pages. On 4.5.2+ prefer the native `start` cursor above.
 
-> **NetBox 4.5.8+**: The `start` parameter for cursor-based pagination may already be available. Full support uses `WHERE pk >= start` for O(1) performance at any depth. See [GitHub #21110](https://github.com/netbox-community/netbox/issues/21110).
+### GraphQL Pagination Defaults (differ from REST)
+
+- Omitting `pagination` entirely returns **all** matching records.
+- `pagination` without `limit` returns Strawberry Django's default of **100** (the REST default of 50 does **not** apply to GraphQL).
+- `pagination: {limit: 0}` returns **zero** records — the opposite of REST `?limit=0` (which returns all).
+- `MAX_PAGE_SIZE` (default 1000) caps `limit`.
 
 ## Field Selection
 
@@ -138,7 +154,7 @@ Each unnecessary nested object adds JOINs and serialization overhead.
 
 ## Query Depth
 
-Keep depth ≤ 3. Never exceed 5. Each level multiplies complexity.
+Keep depth ≤ 3. Never exceed 5. Each level multiplies complexity. **NetBox 4.6.1+** enforces `GRAPHQL_MAX_QUERY_DEPTH` server-side, so an over-deep query can be hard-rejected (not merely slow) depending on instance config.
 
 ```
 Level 1: site_list

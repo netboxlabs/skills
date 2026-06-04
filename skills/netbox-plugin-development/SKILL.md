@@ -21,7 +21,7 @@ license: Apache-2.0
 | Example plugins | `https://github.com/netbox-community` | Community plugin patterns |
 
 Build plugins that extend NetBox with custom models, views, APIs, and UI elements.
-Target: **NetBox 4.5+** / **Python 3.12+**.
+Target: **NetBox 4.5–4.6** / **Python 3.12–3.14**. Note the Django split: **NetBox 4.5 runs on Django 5.2, NetBox 4.6 on Django 6.0** — code, migrations, and third-party deps must be Django 6.0-compatible when targeting 4.6+.
 
 > For REST API client patterns (pagination, filtering, tokens), see
 > [netbox-api-integration](../netbox-api-integration/SKILL.md).
@@ -111,7 +111,7 @@ class MyPluginConfig(PluginConfig):
     author_email = 'you@example.com'
     base_url = 'myplugin'               # URL prefix under /plugins/
     min_version = '4.5.0'
-    max_version = '4.5.99'              # Use .99 to allow patch releases
+    max_version = '4.6.99'              # span 4.5–4.6; use .99 to allow patch releases
     default_settings = {'feature_x': True}
     required_settings = []
 
@@ -440,7 +440,7 @@ Use `pyproject.toml` (modern) or `setup.py`:
 [project]
 name = "netbox-myplugin"
 version = "1.0.0"
-dependencies = ["netbox>=4.5.0,<4.6"]
+dependencies = ["netbox>=4.5.0,<4.7"]   # span 4.5–4.6
 
 [project.entry-points."netbox.plugins"]
 netbox_myplugin = "netbox_myplugin:config"
@@ -462,21 +462,28 @@ publishing to PyPI, and version compatibility matrix.
 4. **Missing `search()` on filterset** — `?q=` won't work without it
 5. **`models` on TemplateExtension** — must be list of `'app.model'` strings, not classes; `None` = global
 6. **Heavy imports in `__init__.py`** — use `ready()` for signals and deferred imports (fixed in 4.5.2 but still best practice)
-7. **`max_version` too strict** — use `'4.5.99'` not `'4.5.0'` to allow patches
+7. **`max_version` too strict** — use `'4.6.99'` (or your top minor's `.99`) not `'4.5.0'` to allow patches
 8. **GraphQL uses Strawberry** since 4.0 — Graphene patterns will not work
 9. **`@register_filterset`** (4.5+) — without it, lookup modifiers won't appear in UI
-10. **Permissions** — format is `<plugin_name>.view_<model>`, `<plugin_name>.add_<model>`, etc.
+10. **Permissions** — format is `<plugin_name>.view_<model>`, `<plugin_name>.add_<model>`, etc. **Custom actions (4.6.0+):** declare extra actions via your model's `Meta.permissions`; NetBox auto-registers them as actions selectable in the ObjectPermission form (preferred over ad-hoc permission checks).
 
 ---
 
 ## Version Notes
 
+### NetBox 4.6 (2026)
+- **Django 6.0** (was 5.2 in 4.5) — ensure code, migrations, and dependencies are Django 6.0-compatible; set `min_version='4.6.0'` for any plugin using 4.6-only APIs below
+- **Declarative view layouts / reusable UI components** — `from netbox.ui import layout` (`Layout`/`Row`/`Column`); the modern alternative to hand-written detail templates (requires NetBox ≥4.6.0)
+- **Custom model actions / permissions via `Meta.permissions`** — declare them on your model's `Meta`; NetBox auto-registers them as actions selectable in the ObjectPermission form
+- **Custom serializer resolvers** for `get_serializer_for_model()` (4.6.2) — register a resolver to control serializer lookup
+- **Security:** ExportTemplate/ConfigTemplate `environment_params` RCE (CVE-2026-29514) fixed in 4.6.1 — the allowlist blocks `extensions`/`finalize`/`loader`/`bytecode_cache`
+- **Deprecations to avoid:** `DEFAULT_ACTION_PERMISSIONS`, legacy view actions, the internal registry `models` key, the custom `querystring` template tag, and `OptionalLimitOffsetPagination`
+
 ### NetBox 4.5 (2026-01-06)
-- **Python 3.12+ required** (dropped 3.10/3.11)
+- **Python 3.12+ required** (dropped 3.10/3.11); Django 5.2
 - `PrimaryModel`, `OrganizationalModel`, `NestedGroupModel` now in plugins API
 - `@register_filterset` decorator enables UI lookup modifiers
 - `OwnerMixin` available for object ownership
-- Declarative view layouts (migrating from custom HTML templates)
 - **Breaking:** GraphQL filter syntax requires lookup modifiers for IDs/enums
 
 ### NetBox 4.4 (2025-09-02)

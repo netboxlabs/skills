@@ -141,8 +141,9 @@ For NetBox's data model and relationships, see [netbox-data-modeling](../netbox-
 - **Import in phases** — Sites/racks first, verify, then devices, verify, then IPAM
 - **Reference objects by name/slug in CSV**, not database IDs
 - **DeviceType/ModuleType use YAML format**, not CSV (they include component templates)
-- **Bulk create** with pynetbox: `nb.dcim.devices.create([{...}, {...}])` — up to 100 per request
+- **Bulk create** with pynetbox: `nb.dcim.devices.create([{...}, {...}])` — batch in chunks of ~100 (a recommended size for throughput/memory, **not** a NetBox-enforced limit)
 - **Exclude config_context** from API queries during bulk operations (massive performance impact)
+- **Reading back large sets for validation:** on NetBox **4.6+** prefer cursor pagination (`?start=<id>&limit=N`) over deep `?offset=` scans — offset slows linearly at high offsets. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 For API patterns, see [netbox-api-integration](../netbox-api-integration/SKILL.md).
 

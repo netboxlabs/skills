@@ -10,8 +10,11 @@ No dependencies. Create first.
 - Manufacturer
 - ClusterType
 - ClusterGroup
+- VirtualMachineType *(4.6)*
 - CircuitType
 - RackRole
+- RackGroup *(4.6)* — flat organizational grouping
+- CableBundle *(4.6)* — group cables before creating them (Tier 13)
 - IPAM Role
 - ContactRole
 - TunnelGroup
@@ -44,11 +47,11 @@ Self-referential. Create top-down (parents first).
 ## Tier 4: Site Children
 
 - Location (needs: Site required, parent Location optional)
-- VLANGroup (needs: scope optional — Region/SiteGroup/Site/Location)
+- VLANGroup (needs: scope optional — Region/SiteGroup/Site/Location/Rack/ClusterGroup/Cluster, +RackGroup *(4.6)*)
 
 ## Tier 5: Racks & VLANs
 
-- Rack (needs: Site required, Location optional, RackRole optional, Tenant optional)
+- Rack (needs: Site required, Location optional, RackRole optional, RackGroup optional *(4.6)*, Tenant optional)
 - VLAN (needs: VLANGroup optional, Tenant optional, IPAM Role optional)
 
 ## Tier 6: Device Types
@@ -69,7 +72,7 @@ Self-referential. Create top-down (parents first).
 
 ## Tier 9: Virtual Machines
 
-- VirtualMachine (needs: Cluster optional, Site optional, DeviceRole optional, Platform optional, Tenant optional)
+- VirtualMachine (needs: Cluster optional *(4.6: now optional — was required)*, Site optional, DeviceRole optional, Platform optional, VirtualMachineType optional *(4.6)*, Tenant optional)
 - VMInterface (needs: VirtualMachine)
 - VirtualDisk (needs: VirtualMachine)
 
@@ -81,7 +84,7 @@ Self-referential. Create top-down (parents first).
 - Prefix (needs: VRF optional, VLAN optional, IPAM Role optional, Tenant optional, scope optional)
 - IPRange (needs: VRF optional, Tenant optional, IPAM Role optional)
 - IPAddress (needs: VRF optional, Tenant optional)
-- ASN / ASNRange (needs: RIR required, Tenant optional)
+- ASN / ASNRange (needs: RIR required, Tenant optional; ASN adds IPAM Role optional *(4.6)*)
 
 ## Tier 11: IP Assignments
 
@@ -99,7 +102,7 @@ Self-referential. Create top-down (parents first).
 
 ## Tier 13: Connections & Links
 
-- Cable (needs: two endpoints — interfaces, ports, etc.)
+- Cable (needs: two endpoints — interfaces, ports, etc.; CableBundle optional *(4.6)*)
 - WirelessLink (needs: two Interfaces)
 - Tunnel, TunnelTermination
 - L2VPN, L2VPNTermination

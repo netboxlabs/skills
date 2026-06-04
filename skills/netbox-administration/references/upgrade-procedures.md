@@ -2,12 +2,15 @@
 
 ## Version Compatibility Matrix
 
-| NetBox | Python | PostgreSQL | Redis |
-|--------|--------|-----------|-------|
-| 4.5 | 3.12–3.14 | 14+ | 4.0+ |
-| 4.4 | 3.10–3.12 | 14+ | 4.0+ |
-| 4.3 | 3.10–3.12 | 14+ | 4.0+ |
-| 4.2 | 3.10–3.12 | 13+ | 4.0+ |
+| NetBox | Python | PostgreSQL | Redis | Django |
+|--------|--------|-----------|-------|--------|
+| 4.6 | 3.12–3.14 | 14+ (14 deprecated; 15+ required from v4.7) | 4.0+ | 6.0 |
+| 4.5 | 3.12–3.14 | 14+ | 4.0+ | 5.x |
+| 4.4 | 3.10–3.12 | 14+ | 4.0+ | 5.x |
+| 4.3 | 3.10–3.12 | 14+ | 4.0+ | 5.x |
+| 4.2 | 3.10–3.12 | 13+ | 4.0+ | 5.x |
+
+> **4.6 platform shifts:** Django 6.0 (was 5.x) and **PostgreSQL 14 is deprecated** — v4.7 will require PostgreSQL 15+. Upgrade Postgres to 15+ before moving past 4.6. Also run **≥4.6.1** to avoid the template `environment_params` RCE (CVE-2026-29514) present in 4.6.0.
 
 ## Pre-Upgrade Checklist
 

@@ -40,7 +40,7 @@ Objects must be created in dependency order — a child cannot reference a paren
 
 6. VIRTUALIZATION
    ├── Cluster Types → Cluster Groups → Clusters
-   ├── Virtual Machines (require Cluster)
+   ├── Virtual Machines (require a Cluster OR a Device; NetBox 4.6+ makes `cluster` optional)
    └── VM Interfaces (require VM)
 
 7. CIRCUITS
@@ -197,6 +197,8 @@ pci_devices = nb.dcim.devices.filter(tag="pci-compliant")
 pci_prefixes = nb.ipam.prefixes.filter(tag="pci-compliant")
 pci_vlans = nb.ipam.vlans.filter(tag="pci-compliant")
 ```
+
+Setting `tags=` (or `device.tags = [...]`) **replaces the entire tag set** — unsafe when multiple writers each manage different tags. On **NetBox 4.6+**, use the write-only `add_tags` / `remove_tags` REST fields for concurrency-safe partial edits (see [rest-api-patterns.md](rest-api-patterns.md)).
 
 Tags vs Custom Fields: tags are cross-object and boolean (present/absent); custom fields are type-specific with structured values.
 

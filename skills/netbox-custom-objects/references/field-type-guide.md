@@ -191,18 +191,18 @@ References multiple instances. Creates an M2M relationship.
 
 ### Cross-Custom-Object References
 
-Reference another custom object type using the internal model name:
+> **Plugin v0.5+**: reference another custom object type with `app_label: "custom-objects"` and `model` set to the target COT's **slug**:
 
 ```json
 {
   "name": "parent_record",
   "type": "object",
-  "app_label": "netbox_custom_objects",
-  "model": "table1model"
+  "app_label": "custom-objects",
+  "model": "dhcp-scopes"
 }
 ```
 
-The `model` value is `table{id}model` where `{id}` is the target COT's database ID. Look up the COT's `id` via the API first.
+For a field that may reference several object types, set `is_polymorphic: true` and list the allowed types in `related_object_types_input` instead of `app_label`/`model`. (Older 0.4.x builds required an internal `table{id}model` name; do not use that against v0.5+.)
 
 ## Validation Summary
 

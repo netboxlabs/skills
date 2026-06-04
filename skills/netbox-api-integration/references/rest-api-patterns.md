@@ -110,6 +110,28 @@ async def get_all_async(api_url, endpoint, headers, limit=100):
 | Background sync | 100-250 |
 | Bulk export | 500-1000 |
 
+### Cursor Pagination (NetBox 4.6+)
+
+For very large datasets, offset pagination slows down as the DB scans all rows up to the offset. Cursor (keyset) pagination filters by PK instead — pass `start` (minimum `id`) and `limit`:
+
+```python
+def get_all_cursor(api_url, endpoint, headers, limit=1000):
+    results, url = [], f"{api_url}/{endpoint}/?start=0&limit={limit}"
+    while url:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        results.extend(data["results"])
+        url = data.get("next")   # server builds next start for you
+    return results
+```
+
+- Manual iteration: set the next request's `start` to the last result's `id` + 1.
+- `start` and `offset` together → **400**.
+- `count` is always `null` in cursor mode (counting would negate the speedup).
+- `previous` is always `null` — forward-only.
+- Use offset pagination when you need a total `count` or backward navigation.
+
 ## Brief Mode
 
 `?brief=True` returns minimal fields (~90% smaller): `id`, `url`, `display`, and natural key fields.
@@ -142,6 +164,40 @@ requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)
 ```
 
 Config context is the single most expensive field — 10-100x slower with it included.
+
+`?omit=field1,field2` (NetBox 4.5.2+) is a companion to `?fields=`/`?exclude=` that drops the named fields from full responses. `fields` and `omit` are mutually exclusive — if both are passed, `fields` wins.
+
+## Optimistic Concurrency (ETag / If-Match, NetBox 4.6+)
+
+Detail-view responses for a single object (GET/POST/PATCH/PUT) include a weak `ETag` header. Send it back on a later write via `If-Match` to guard against the lost-update problem:
+
+```python
+obj = requests.get(f"{API_URL}/dcim/sites/1/", headers=headers)
+etag = obj.headers["ETag"]
+
+resp = requests.patch(f"{API_URL}/dcim/sites/1/", headers={**headers, "If-Match": etag},
+                      json={"status": "decommissioning"})
+if resp.status_code == 412:        # object changed since we read it
+    # response body carries the current ETag — re-read and retry
+    ...
+```
+
+- Mismatch → **412 Precondition Failed**, with the current ETag in the response.
+- `If-Match: *` asserts only that the object exists.
+- Omitting `If-Match` keeps prior last-write-wins behavior.
+
+## Partial Tag Edits (add_tags / remove_tags, NetBox 4.6+)
+
+Taggable models accept write-only `add_tags` / `remove_tags` fields that adjust only the named tags without replacing the whole set — safer than `tags=` when multiple writers each manage a subset:
+
+```python
+requests.patch(f"{API_URL}/dcim/sites/1/", headers=headers,
+    json={"add_tags": [{"name": "production"}], "remove_tags": [{"name": "staging"}]})
+```
+
+- Cannot be combined with `tags` in the same request.
+- `remove_tags` is update-only (not valid on create).
+- The same tag may not appear in both lists.
 
 ## Filtering
 
@@ -246,6 +302,7 @@ headers["X-Request-ID"] = str(uuid.uuid4())
 | 401 | Unauthorized | Check token format and validity |
 | 403 | Forbidden | Check permissions, IP restrictions |
 | 404 | Not Found | Check endpoint/ID |
+| 412 | Precondition Failed (`If-Match` ETag mismatch, 4.6+) | Re-read object, reconcile, retry with new ETag |
 | 429 | Rate Limited | Backoff using `Retry-After` header |
 | 500+ | Server Error | Retry with exponential backoff |
 

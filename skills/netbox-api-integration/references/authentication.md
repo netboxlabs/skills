@@ -23,7 +23,7 @@ Authorization: Token 0123456789abcdef0123456789abcdef01234567
 ```
 
 - 40-character hex string stored **in plaintext** in the database
-- **Deprecated in NetBox 4.7.0** — migrate before this version
+- **Deprecated as of NetBox 4.6; removed in 5.0** — migrate before 5.0
 
 ### Migration Timeline
 
@@ -31,8 +31,8 @@ Authorization: Token 0123456789abcdef0123456789abcdef01234567
 |----------------|--------|
 | < 4.5.0 | v1 tokens only |
 | 4.5.0 | v2 introduced, v1 fully supported |
-| 4.7.0 | v1 deprecated (warnings logged) |
-| Future | v1 removed |
+| 4.6.0 | v1 deprecated |
+| 5.0.0 | v1 removed |
 
 ## Server Configuration for v2 Tokens
 
@@ -91,6 +91,8 @@ def provision_token(netbox_url, username, password, description=None):
 
 Use cases: CI/CD bootstrapping, dynamic environment provisioning, token rotation automation.
 
+> **NetBox 4.6.1+:** the plaintext token `key` is returned by the REST API **only once**, in the creation/provision response. Only a hash is stored afterward, so the full token is never retrievable again — capture and store `response.json()["key"]` immediately.
+
 ## IP Restrictions
 
 Tokens can be restricted to specific IPs or CIDR ranges. Set `allowed_ips` on the token (e.g., `["10.0.0.0/8", "192.168.1.100/32"]`). Requests from other IPs receive 403.
@@ -104,7 +106,7 @@ Create a user with read-only permissions, then generate a token for that user. U
 | Practice | Priority |
 |----------|----------|
 | Use v2 tokens on NetBox 4.5+ | CRITICAL |
-| Migrate v1 → v2 before 4.7 | CRITICAL |
+| Migrate v1 → v2 before 5.0 (v1 deprecated 4.6) | CRITICAL |
 | Never store tokens in code | CRITICAL |
 | Use environment variables | HIGH |
 | Implement token rotation | HIGH |

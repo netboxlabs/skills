@@ -28,7 +28,9 @@ Orb Agent is a Docker-based network discovery agent that automatically discovers
 
 **Data flow:** Orb Agent → gRPC → Diode Server → Diode NetBox Plugin → NetBox
 
-**Prerequisites:** NetBox 4.2.3+, Diode server deployed, diode-netbox-plugin installed in NetBox.
+**Prerequisites:** NetBox 4.5+ (covers 4.5.x–4.6.x), Diode server deployed, diode-netbox-plugin installed in NetBox. This skill targets **orb-agent v2.9.x**.
+
+> Ingesting the NetBox 4.6 models (CableBundle, RackGroup, VirtualMachineType) — e.g. from switch-stack discovery — requires a NetBox 4.6 install with a matching Diode plugin/SDK.
 
 For Diode SDK usage and custom ingestion patterns, see [netbox-diode](../netbox-diode/SKILL.md).
 
@@ -79,8 +81,8 @@ The agent.yaml has four top-level sections under `orb:`:
 
 | Section | Purpose |
 |---------|---------|
-| `config_manager` | How policies are loaded — `local` (in-file) or `git` (remote repo) |
-| `secrets_manager` | Optional HashiCorp Vault integration for credentials |
+| `config_manager` | How policies are loaded — `active:` selects a source under `sources:` (`local`, `git`, or `fleet`) |
+| `secrets_manager` | Optional external secret store — `active:` selects a provider under `sources:` |
 | `backends` | Which discovery engines to enable, plus common Diode settings |
 | `policies` | Per-backend discovery policy definitions |
 
@@ -88,14 +90,38 @@ See [references/agent-config-format.md](references/agent-config-format.md) for t
 
 ### Config Manager
 
+Both `config_manager` and `secrets_manager` use the same shape: an `active:` key naming the source, and a `sources:` map of source configs.
+
 - **local** — Policies defined in the same YAML file. Simplest setup.
-- **git** — Polls a Git repo for policies. The repo needs a `selector.yaml` that matches agents by labels to policy files. Supports basic auth, SSH, branch selection, and cron-based polling.
+- **git** — Polls a Git repo for policies. Configured under `sources.git` with `url:`, `branch:`, `auth:` (a **string**: `basic` or `ssh`), `username:`/`password:` (basic) or `private_key:` (ssh), and `skip_tls:`. The repo needs a root `selector.yaml` that matches agents to policy files.
 
-### Secrets Manager (Vault)
+```yaml
+config_manager:
+  active: git
+  sources:
+    git:
+      url: "https://github.com/org/policies.git"   # NOT "repo:"
+      branch: main
+      auth: basic                                   # string, NOT auth.type
+      username: orb
+      password: ${GIT_TOKEN}
+      skip_tls: false
+```
 
-Reference secrets with `${vault://engine/path/to/secret/key}`. Supports token, AppRole, UserPass, Kubernetes, and LDAP auth methods. Optional `schedule` for polling secret rotations (auto-updates policies).
+The agent matches selectors against its **top-level `orb.labels`** (not `backends.common.agent_labels`, which are telemetry labels only). See [references/deployment-patterns.md](references/deployment-patterns.md) for the `selector.yaml` format.
 
-Environment variables also work: `${VAR_NAME}`.
+### Secrets Manager
+
+Same `active:` + `sources:` shape. orb-agent v2.9 ships four providers:
+
+| Provider (`active:`) | Reference syntax |
+|----------------------|------------------|
+| `vault` (HashiCorp) | `${vault://engine/path/to/secret/key}` — token, AppRole, UserPass, Kubernetes, LDAP auth; multi-segment mount paths supported |
+| `doppler` | `${doppler://<secret_name>}` or qualified `${doppler://<project>/<config>/<secret_name>}` |
+| `cyberark` (CCP, beta) | `${cyberark://<Safe>/<Object>}` or `${cyberark://<AppID>//<Safe>/<Object>/<Field>}` |
+| `delinea` (Secret Server, beta) | `${delinea://id/<id>/<field>}` or `${delinea://path/<path>/<field>}` |
+
+Optional `schedule` polls for secret rotations (auto-updates policies). Plain environment variables also work: `${VAR_NAME}`.
 
 ## Discovery Backends
 
@@ -128,6 +154,8 @@ Connects to devices via NAPALM and discovers detailed inventory — devices, int
 - Custom NAPALM drivers via `INSTALL_DRIVERS_PATH` env var
 - Config capture (`capture_running_config`, `capture_startup_config`)
 - YAML anchors for credential reuse
+- **Switch-stack / Virtual Chassis** — when a target is a switch stack, discovery emits one `VirtualChassis` entity plus one `Device` per member and routes interfaces/IPs to the owning member (Cisco IOS, Juniper, Aruba CX, HP Comware, Brocade FastIron, Huawei VRP)
+- `netbox_id` per-target scope option for matching an existing device by PK
 
 ### SNMP Discovery
 

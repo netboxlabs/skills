@@ -161,5 +161,6 @@ Use `nb_lookup` for ad-hoc queries when the inventory plugin doesn't provide the
    ```yaml
    collections:
      - name: netbox.netbox
-       version: ">=3.20.0,<4.0.0"
+       version: ">=3.20.0,<4.0.0"   # example — verify against the release that supports your NetBox 4.5/4.6
    ```
+   The literal above is illustrative. The `netbox.netbox` collection supports the two most recent NetBox releases, so confirm the version (and its NetBox support matrix) for your target 4.5/4.6 minor rather than copying a fixed pin.

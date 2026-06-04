@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Patterns and practices for integrating with NetBox REST and GraphQL APIs. Covers authentication, querying, bulk operations, performance optimization, data modeling, and integration tooling.
 
-**Target:** NetBox 4.4+ (4.5+ for v2 tokens)
+**Target:** NetBox 4.4+ (covers 4.5.x–4.6.x). v2 tokens require 4.5+; REST cursor pagination, ETag/If-Match, and `add_tags`/`remove_tags` require 4.6+.
 **Scope:** API integration only — not plugin development, custom scripts, or NetBox administration.
 
 > **Your knowledge of NetBox APIs may be outdated.** Pagination behavior, filtering expressions, token formats, and GraphQL features change between releases. Prefer retrieval over pre-trained knowledge for specific API details.
@@ -42,17 +42,17 @@ You should see a JSON response with `netbox-version`. If you get 403, your token
 
 ## Authentication
 
-Use **v2 tokens** on NetBox 4.5+. v1 tokens are deprecated in 4.7.
+Use **v2 tokens** on NetBox 4.5+. v1 tokens are **deprecated as of 4.6 and will be removed in 5.0**.
 
 ```python
 # v2 token (recommended)
 headers = {"Authorization": "Bearer nbt_abc123.xxxxxxxxxxxxxxxx"}
 
-# v1 token (legacy, migrate before 4.7)
+# v1 token (legacy — deprecated 4.6, removed 5.0; migrate before 5.0)
 headers = {"Authorization": "Token 0123456789abcdef01234567"}
 ```
 
-v2 tokens require `API_TOKEN_PEPPERS` in NetBox server config. Use the provisioning endpoint (`POST /api/users/tokens/provision/`) for automated token creation.
+v2 tokens require `API_TOKEN_PEPPERS` in NetBox server config. Use the provisioning endpoint (`POST /api/users/tokens/provision/`) for automated token creation. The plaintext token `key` is returned **only once** at creation (4.6.1+) — capture it immediately; only a hash is stored thereafter.
 
 See [references/authentication.md](references/authentication.md) for token migration, IP restrictions, and provisioning details.
 
@@ -70,9 +70,16 @@ def get_all(api_url, endpoint, headers, limit=100):
     return results
 ```
 
+> **NetBox 4.6+ — cursor pagination.** For large datasets, pass `?start=<pk>&limit=<n>` instead of `offset`. Returns objects with `id >= start`, ordered by PK. Iterate by setting the next `start` to the last result's `id` + 1; follow `next` until null. Gotchas: `start` and `offset` together → **400**; `count` is always `null` in cursor mode; `previous` is always `null` (forward-only). Use offset pagination when you need a total `count` or backward navigation.
+
 ### Use PATCH, Not PUT
 
 PATCH updates only specified fields. PUT replaces the entire object — omitted fields may be cleared.
+
+### Concurrency & Tags (NetBox 4.6+)
+
+- **Optimistic concurrency (ETag / If-Match).** Detail-view responses (GET/POST/PATCH/PUT on a single object) return a weak `ETag` header. Send it back on a later PATCH/PUT via `If-Match: <etag>`; if the object changed meanwhile, the server rejects with **412 Precondition Failed** and returns the current ETag. `If-Match: *` just asserts the object exists. Omitting the header keeps last-write-wins behavior. Use it to guard against lost updates in multi-writer integrations.
+- **Partial tag edits (`add_tags` / `remove_tags`).** Write-only fields that add or remove specific tags without replacing the whole `tags` set — concurrency-safe when multiple clients each own a subset of tags. Constraints: cannot be combined with `tags` in the same request; `remove_tags` is update-only (not on create); the same tag can't appear in both lists.
 
 ### Bulk Operations Use List Endpoints
 
@@ -147,9 +154,13 @@ site_list(pagination: {limit: 10}) {
 
 > **NetBox 4.5+**: Use local filter fields (e.g., `site` on `interface_list`) instead of deeply nested filter paths.
 >
-> **NetBox 4.5.x**: Use ID range filtering (`filters: {id__gte: N}`) for efficient deep pagination.
->
-> **NetBox 4.5.8+**: Cursor-based pagination (`start` parameter) may already be available. Full support planned for 4.6.0+.
+> **NetBox 4.5.2+**: Cursor-based pagination is GA. Pass `pagination: {start: N, limit: M}` — returns records with `id >= start`, ordered by PK. Set the next page's `start` to the last record's `id` + 1. (Omit `start` and it falls back to offset pagination.) This supersedes the older `filters: {id__gte: N}` deep-pagination workaround, which is only needed pre-4.5.2.
+
+**GraphQL pagination defaults (differ from REST):**
+- Omitting `pagination` entirely returns **all** matching records.
+- `pagination` without `limit` returns Strawberry Django's default of **100** (not the REST default of 50).
+- `pagination: {limit: 0}` returns **zero** records — the *opposite* of REST `?limit=0` (which returns all).
+- `MAX_PAGE_SIZE` (default 1000) caps `limit`. **NetBox 4.6.1+** also enforces `GRAPHQL_MAX_QUERY_DEPTH` server-side, so overly deep queries can be hard-rejected, not just slow.
 
 ### GraphQL vs REST Decision
 

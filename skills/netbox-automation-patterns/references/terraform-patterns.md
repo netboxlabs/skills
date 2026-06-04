@@ -28,6 +28,8 @@ provider "netbox" {
 |-----------------|---------------|
 | v5.0.0+ | 4.3–4.4.x |
 
+> The community Terraform provider (e-breuninger/terraform-provider-netbox) trails NetBox releases. For **NetBox 4.5/4.6** do not assume the row above still applies — check the provider's current release notes / compatibility matrix and pin to the version that lists support for your exact NetBox minor. NetBox can introduce breaking API changes in minor releases, so a mismatched provider fails in subtle ways.
+
 ---
 
 ## Resource Patterns

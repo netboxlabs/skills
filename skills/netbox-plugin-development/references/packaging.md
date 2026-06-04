@@ -61,14 +61,15 @@ This is how NetBox discovers and loads your plugin.
 In `PluginConfig`:
 ```python
 min_version = '4.5.0'     # oldest NetBox version supported
-max_version = '4.5.99'    # use .99 to allow all patch releases
+max_version = '4.6.99'    # span 4.5–4.6; use .99 to allow all patch releases
 ```
 
 **Versioning guidelines:**
 - Use `.99` for max_version — `'4.5.0'` would block `4.5.1`!
 - Test against min and max versions in CI
-- Bump `min_version` when you use features from a newer release
+- Bump `min_version` when you use features from a newer release — e.g. `'4.6.0'` if you use declarative UI layouts or `Meta.permissions` custom actions
 - NetBox refuses to load plugins outside the declared version range
+- Remember the Django split when spanning 4.5–4.6: 4.5 is Django 5.2, 4.6 is Django 6.0
 
 ## Building & Publishing
 
@@ -138,8 +139,8 @@ Test against multiple NetBox versions in CI:
 # .github/workflows/test.yml
 strategy:
   matrix:
-    netbox-version: ['4.5.0', '4.5.7']
-    python-version: ['3.12', '3.13']
+    netbox-version: ['4.5.0', '4.5.8', '4.6.2']
+    python-version: ['3.12', '3.13', '3.14']
 ```
 
 Clone NetBox at the target version, install your plugin, run tests:

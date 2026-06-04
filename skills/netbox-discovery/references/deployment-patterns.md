@@ -103,16 +103,21 @@ For managing multiple agents from a central policy repo:
 
 ```yaml
 orb:
+  labels:                 # top-level — what the git selector matches against
+    region: us-east
+    site: dc1
+    env: production
+
   config_manager:
     active: git
-    git:
-      repo: https://github.com/org/orb-policies.git
-      branch: main
-      auth:
-        type: basic
+    sources:
+      git:
+        url: https://github.com/org/orb-policies.git   # NOT "repo:"
+        branch: main
+        auth: basic       # string, NOT auth.type
         username: ${GIT_USER}
         password: ${GIT_TOKEN}
-      schedule: "*/5 * * * *"
+        skip_tls: false
 
   backends:
     common:
@@ -121,10 +126,8 @@ orb:
         client_id: ${DIODE_CLIENT_ID}
         client_secret: ${DIODE_CLIENT_SECRET}
         agent_name: agent-us-east-01
-      agent_labels:
-        region: us-east
-        site: dc1
-        env: production
+      agent_labels:       # telemetry labels on exported data — NOT selector matching
+        managed_by: orb
 
     network_discovery:
     device_discovery:
@@ -133,29 +136,36 @@ orb:
 
 ### Policy Repo — selector.yaml
 
+A **map of named selector blocks**. Each block's `selector:` is matched against
+the agent's top-level `orb.labels`; `policies:` maps a policy name to its file path:
+
 ```yaml
-selectors:
-  - match:
-      labels:
-        region: us-east
-    policies:
-      - policies/us-east-network.yaml
-      - policies/us-east-devices.yaml
+agent_us_east:
+  selector:
+    region: us-east
+  policies:
+    network_policy:
+      path: policies/us-east-network.yaml
+    device_policy:
+      path: policies/us-east-devices.yaml
 
-  - match:
-      labels:
-        region: eu-west
-    policies:
-      - policies/eu-west-network.yaml
+agent_eu_west:
+  selector:
+    region: eu-west
+  policies:
+    network_policy:
+      path: policies/eu-west-network.yaml
 
-  - match:
-      labels:
-        env: production
-    policies:
-      - policies/production-snmp.yaml
+agent_all_prod:
+  selector:
+    env: production
+  policies:
+    snmp_policy:
+      path: policies/production-snmp.yaml
+      enabled: true       # optional; false to skip
 ```
 
-Each policy file contains the `policies:` section for the matched backend(s).
+Each referenced policy file contains the `policies:` section for the matched backend(s).
 
 ## System Requirements
 

@@ -68,7 +68,7 @@ with open("sites.csv") as f:
         if not nb.dcim.sites.get(name=row["name"]):
             sites.append({"name": row["name"], "slug": row["slug"], "status": "active"})
     if sites:
-        nb.dcim.sites.create(sites)  # bulk create, up to 100 per call
+        nb.dcim.sites.create(sites)  # bulk create; ~100 per call is a good chunk size, not a NetBox cap
 
 # Phase 2: Devices (sites must exist first)
 with open("devices.csv") as f:
@@ -82,7 +82,7 @@ with open("devices.csv") as f:
                 "site": {"name": row["site"]},
                 "status": row.get("status", "active"),
             })
-    # Bulk create in batches of 100
+    # Bulk create in batches (~100 is a sensible chunk size — not a NetBox limit; tune for your data)
     for i in range(0, len(devices), 100):
         nb.dcim.devices.create(devices[i:i+100])
 
@@ -106,7 +106,9 @@ with open("devices.csv") as f:
             device.save()
 ```
 
-**Performance:** Use `?exclude=config_context` on device queries, `?brief=True` for lookups, bulk create up to 100/request, cache site/type lookups.
+**Performance:** Use `?exclude=config_context` on device queries, `?brief=True` for lookups, batch bulk creates (~100/request — a tuning choice, not a NetBox limit), cache site/type lookups. On NetBox **4.6+** use cursor pagination (`?start=`) instead of deep `?offset=` when reading back large sets for validation, and add `?fields=` to project only the columns you need.
+
+**Provenance tagging (NetBox 4.6+):** to stamp imported objects with an "imported-from-X" tag without clobbering existing tags, use the write-only `add_tags` / `remove_tags` serializer fields instead of read-modify-writing the full `tags` list — safer for re-runnable importers and concurrent writers.
 
 ## Strategy 3: Diode SDK
 

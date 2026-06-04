@@ -160,7 +160,7 @@ These apply across all automation approaches:
 
 - **Rate limiting**: Large automation runs (bulk Ansible plays, Terraform applies) should implement backoff to avoid overwhelming the NetBox API.
 
-- **Pagination**: All tools (pynetbox, Terraform provider, Ansible collection) handle pagination internally, but be aware of it when writing custom integrations.
+- **Pagination**: All tools (pynetbox, Terraform provider, Ansible collection) handle pagination internally, but be aware of it when writing custom integrations. NetBox **4.6** adds cursor-based `start` pagination (an efficient alternative to deep `offset` scans) — see [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 - **Idempotency**: Ansible modules are idempotent by design. Terraform is declarative. Webhooks are fire-and-forget — implement idempotency on the receiver side.
 
