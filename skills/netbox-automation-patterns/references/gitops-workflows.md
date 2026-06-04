@@ -145,7 +145,7 @@ Use NetBox's official Docker image in CI/CD for integration testing:
 # GitHub Actions example
 services:
   netbox:
-    image: netboxcommunity/netbox:latest
+    image: netboxcommunity/netbox:v4.6-3.4.0   # pin to the NetBox version you test against; ':latest' silently drifts (e.g. into 4.6/Django 6.0)
     ports:
       - 8000:8080
     env:

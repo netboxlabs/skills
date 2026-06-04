@@ -6,7 +6,7 @@
 pip install netboxlabs-diode-sdk
 ```
 
-**Requirements:** Python 3.10+, NetBox 4.2.3+
+**Requirements:** Python 3.10+, NetBox 4.5+ (covers 4.5.x–4.6.x); diode-sdk-python v1.12.0
 
 ## Client Setup
 

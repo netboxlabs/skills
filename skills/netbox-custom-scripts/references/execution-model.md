@@ -9,7 +9,7 @@ Scripts execute as background jobs via Django-RQ (Redis Queue):
 3. Job is queued to Redis
 4. RQ worker picks it up and executes
 5. All execution is wrapped in `transaction.atomic()`
-6. On completion, job status is updated and notifications sent
+6. On completion, job status is updated and notifications sent — **except** for scripts running in the background on NetBox **4.6+**, where completion notifications are disabled (poll job status instead). 4.6.2 also prevents duplicate scheduled background jobs.
 
 ## Job Lifecycle States
 

@@ -1,6 +1,6 @@
 # NetBox Model Relationship Map
 
-Complete map of apps, models, base classes, and foreign key relationships. NetBox 4.5+.
+Complete map of apps, models, base classes, and foreign key relationships. NetBox 4.6 (notes mark anything added since 4.5).
 
 ## DCIM
 
@@ -11,7 +11,8 @@ Complete map of apps, models, base classes, and foreign key relationships. NetBo
 | Site | PrimaryModel | — | region, group→SiteGroup, tenant |
 | Location | NestedGroupModel | site | parent (self) |
 | RackRole | OrganizationalModel | — | — |
-| Rack | PrimaryModel | site | location, tenant, role→RackRole |
+| RackGroup *(4.6)* | OrganizationalModel | — | — |
+| Rack | PrimaryModel | site | location, tenant, role→RackRole, group→RackGroup *(4.6)* |
 | Manufacturer | OrganizationalModel | — | — |
 | DeviceType | PrimaryModel | manufacturer | — |
 | ModuleType | PrimaryModel | manufacturer | — |
@@ -25,6 +26,8 @@ Complete map of apps, models, base classes, and foreign key relationships. NetBo
 | Interface | ComponentModel | device | — |
 | ConsolePort | ComponentModel | device | — |
 | PowerPort | ComponentModel | device | — |
+| Cable | PrimaryModel | — | bundle→CableBundle *(4.6)* |
+| CableBundle *(4.6)* | OrganizationalModel | — | — |
 
 ## IPAM
 
@@ -38,9 +41,9 @@ Complete map of apps, models, base classes, and foreign key relationships. NetBo
 | Prefix | PrimaryModel + CachedScopeMixin | — | vrf, tenant, vlan, role, scope (generic→Region/SiteGroup/Site/Location) |
 | IPRange | PrimaryModel | start_address, end_address | vrf, tenant, role |
 | IPAddress | PrimaryModel | address | vrf, tenant |
-| VLANGroup | OrganizationalModel + CachedScopeMixin | — | scope (generic) |
+| VLANGroup | OrganizationalModel + CachedScopeMixin | — | scope (generic→Region/SiteGroup/Site/Location/Rack/ClusterGroup/Cluster, +RackGroup *(4.6)*) |
 | VLAN | PrimaryModel | vid | group→VLANGroup, tenant, role |
-| ASN | PrimaryModel | rir, asn | tenant |
+| ASN | PrimaryModel | rir, asn | tenant, role→Role(IPAM) *(4.6)* |
 | ASNRange | PrimaryModel | rir, start, end | tenant |
 | FHRPGroup | PrimaryModel | — | — |
 | Service | PrimaryModel | — | device or VM (generic parent) |
@@ -74,8 +77,9 @@ Complete map of apps, models, base classes, and foreign key relationships. NetBo
 |-------|------|-------------|--------------|
 | ClusterType | OrganizationalModel | — | — |
 | ClusterGroup | OrganizationalModel | — | — |
+| VirtualMachineType *(4.6)* | OrganizationalModel | — | — |
 | Cluster | PrimaryModel + CachedScopeMixin | type | scope (generic), tenant |
-| VirtualMachine | PrimaryModel + ConfigContextModel | — | cluster, site, device, tenant, role, platform |
+| VirtualMachine | PrimaryModel + ConfigContextModel | — | cluster *(optional since 4.6)*, site, device, tenant, role, platform, virtual_machine_type *(4.6)* |
 | VMInterface | ComponentModel | virtual_machine | — |
 | VirtualDisk | ComponentModel | virtual_machine | — |
 
@@ -112,8 +116,10 @@ Complete map of apps, models, base classes, and foreign key relationships. NetBo
 Used by: **Prefix, VLANGroup, Cluster, WirelessLAN**
 
 Replaces direct `site` FK with a generic foreign key:
-- `scope_type` — ContentType (e.g., `dcim.site`, `dcim.region`)
+- `scope_type` — ContentType (e.g., `dcim.site`, `dcim.region`; `dcim.rackgroup` is valid for VLANGroup as of 4.6)
 - `scope_id` — Object PK
+
+The set of allowed `scope_type` values is per-model. VLANGroup accepts the widest set (Region, SiteGroup, Site, Location, Rack, ClusterGroup, Cluster, plus RackGroup in 4.6); Prefix/Cluster/WirelessLAN accept the location-oriented subset.
 
 Cached fields for efficient filtering: `_site`, `_region`, `_location`
 

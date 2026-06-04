@@ -175,9 +175,11 @@ ip route {{ pfx.prefix }} Management
 ### Jinja2 Environment
 
 - Templates run in a **SandboxedEnvironment** — no file I/O, no arbitrary imports
-- **No built-in custom filters** — only standard Jinja2 filters are available by default
 - Custom filters can be added via `JINJA2_FILTERS` in NetBox configuration
-- Per-template `environment_params` can customize behavior (e.g., `jinja2.StrictUndefined`)
+- **Built-in `env()` filter (NetBox 4.6.2+)** — returns a system environment variable's value: `{{ 'WEBHOOK_TOKEN_3' | env }}`. Gated by the `JINJA_ENVIRONMENT_PARAMS` config list (an fnmatch wildcard allowlist of permitted variable names); returns `None` for any name not matched. On 4.6.1 and earlier there are no built-in custom filters — only standard Jinja2 filters.
+- Per-template `environment_params` can customize behavior (e.g., `undefined: jinja2.StrictUndefined`), but on **NetBox 4.6.1+** the keys are **allowlisted** — see below.
+
+> **NetBox 4.6.1+ — `environment_params` allowlist (CVE-2026-29514).** A patched RCE via `environment_params` (shared by ConfigTemplate and ExportTemplate) restricts which keys are accepted (`JINJA_ENV_PARAMS_ALLOWED`). Allowed: the standard delimiter/whitespace/scalar params (`trim_blocks`, `lstrip_blocks`, `autoescape`, `keep_trailing_newline`, block/comment/variable `*_string` delimiters, etc.) and `undefined` — but `undefined` must be one of `jinja2.StrictUndefined`, `jinja2.Undefined`, `jinja2.ChainableUndefined`, `jinja2.DebugUndefined`. **`extensions`, `finalize`, `loader`, and `bytecode_cache` are blocked** and a template setting them is rejected. The skill's examples (`StrictUndefined`, `trim_blocks`, `lstrip_blocks`) remain valid; do not recommend the blocked keys.
 
 ## Common Vendor Patterns
 
@@ -265,8 +267,9 @@ For detailed API examples including pynetbox and error handling, see [references
 
 ### Template Behavior
 
-- **Template resolution is first-match only** — device → role → platform. Cannot assign multiple templates to one device.
+- **Template resolution is first-match only** — device → role → platform. A device still has one *assigned* template. **NetBox 4.6+** lets you render any other template against a device's context without changing assignments by passing `config_template_id` in the render-config request body (or `?config_template_id=<id>` on the UI render URL) — useful for CI/dry-run rendering of alternative templates. (Requires `view` permission on Config Template plus `render_config` on the device.)
 - **No template versioning** — templates are mutable. Only NetBox's change log provides history.
+- **Render debugging (NetBox 4.6+)** — when developing templates in a script/plugin, call `render_jinja2(..., debug=True)` to enable Jinja2's `debug` extension (`{% debug %}`) for inspecting the available context.
 - **extends/include requires DataSource** — inline template_code cannot reference other templates.
 
 ### Config Context Surprises

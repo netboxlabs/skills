@@ -106,7 +106,7 @@ VLAN ←── linked to Prefix (optional)
 - Set `enforce_unique=True` on VRFs to prevent duplicate prefixes
 - Prefixes auto-nest: creating 10.0.1.0/24 inside existing 10.0.0.0/16 builds the tree automatically
 
-**Scope pattern (4.x):** Prefixes and VLANGroups use **CachedScopeMixin** — a generic FK (`scope_type` + `scope_id`) pointing to Region, SiteGroup, Site, or Location. Not a direct `site` FK.
+**Scope pattern (4.x):** Prefixes and VLANGroups use **CachedScopeMixin** — a generic FK (`scope_type` + `scope_id`) rather than a direct `site` FK. VLANGroup scope accepts **Region, SiteGroup, Site, Location, Rack, ClusterGroup, Cluster** (this full set since 4.5), plus **RackGroup as of 4.6**.
 
 ```python
 # Setting scope via API
@@ -174,7 +174,9 @@ See [references/custom-field-types.md](references/custom-field-types.md) for all
 
 ### Custom Fields — Key Points
 
-- **Types:** text, longtext, integer, decimal, boolean, date, datetime, URL, JSON, selection, multi-selection, object, multi-object
+- **Types:** text, longtext, integer, decimal, boolean, date, datetime, URL, JSON, selection, multi-selection, object, multi-object (13 types — unchanged in 4.6; there is **no** standalone "color" type)
+- **JSON fields** accept an optional **`validation_schema`** (4.6+) to enforce a JSON Schema on values
+- **Selection/multi-selection** choice sets support per-choice colors (`choice_colors`, 4.6+) — this is what release notes call the "color custom field", not a new field type
 - **Object/multi-object fields** create relationships to other NetBox objects — prefer these over storing names in text fields
 - **Scope** to specific object types at creation time
 - **Group** fields with `group_name` for UI organization
@@ -228,7 +230,9 @@ See [references/dependency-order.md](references/dependency-order.md) for the com
 9. **Prefix without status** — Always set container/active/reserved. Container = organizational, active = allocated.
 10. **Hardcoded PKs** — Use name/slug for lookups. PKs differ across environments.
 
-## Version Notes (4.5)
+## Version Notes
+
+### NetBox 4.5
 
 | Change | Impact |
 |--------|--------|
@@ -237,7 +241,21 @@ See [references/dependency-order.md](references/dependency-order.md) for the com
 | MACAddress standalone model | MAC addresses are first-class objects, not just interface fields |
 | VirtualDeviceContext | Model VDCs on multi-tenant devices |
 | CachedScopeMixin on Prefix/VLANGroup | Use `scope_type`/`scope_id` instead of direct `site` FK |
-| v2 API tokens | Use `Bearer nbt_<key>.<secret>` format; v1 deprecated in 4.7 |
+| v2 API tokens | Use `Bearer nbt_<key>.<secret>` format |
 | ConfigContextProfile | Validate config context data against JSON Schema |
 | VirtualCircuit, CircuitGroup | New circuit modeling options |
 | VirtualDisk | Disk modeling for VMs |
+
+### NetBox 4.6 (all 4.6+ only — don't assume on a 4.5.x instance)
+
+| Change | Impact |
+|--------|--------|
+| **VirtualMachineType** | Reusable VM classification (like DeviceType) supplying default platform/vCPUs/memory; endpoint `virtualization/virtual-machine-types/`. VM gains optional `virtual_machine_type` FK |
+| **VM `cluster` now optional** | A VM must be tied to **at least one of** site, cluster, or device — clusterless VMs attached directly to a Device are now first-class |
+| **CableBundle** | Logical grouping of cables (conduit/trunk/harness); `Cable.bundle` FK, optional, does not affect tracing; endpoint `dcim/cable-bundles/` |
+| **RackGroup (flat)** | Secondary, **non-hierarchical** rack categorization (row/aisle/cage) orthogonal to Location; `Rack.group` FK; endpoint `dcim/rack-groups/`. Can scope VLANGroups |
+| **VLANGroup scope += rackgroup** | `rackgroup` added to the VLANGroup scope types (full set: region/sitegroup/site/location/rackgroup/rack/clustergroup/cluster) |
+| **ASN `role`** | ASNs can now carry an ipam Role (Roles classify prefixes, VLANs, **and** ASNs) |
+| **JSON CF `validation_schema`** | JSON custom fields can enforce a JSON Schema |
+| **Choice colors** | Per-choice colors on selection/multiselect choice sets (`choice_colors`) — not a new field type |
+| v1 API tokens | **Deprecated in 4.6, removed in 5.0**; v2 `nbt_` tokens return plaintext once at creation (4.6.1) |

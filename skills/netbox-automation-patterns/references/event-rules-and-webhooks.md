@@ -90,6 +90,12 @@ When no body template is set, NetBox sends this JSON structure:
   "event": "created",
   "timestamp": "2026-03-06T15:11:23.503186+00:00",
   "object_type": "dcim.site",
+  "request": {
+    "id": "17af32f0-852a-46ca-a7d4-33ecd0c13de6",
+    "method": "POST",
+    "path": "/api/dcim/sites/",
+    "user": "jstretch"
+  },
   "username": "jstretch",
   "request_id": "17af32f0-852a-46ca-a7d4-33ecd0c13de6",
   "data": {
@@ -102,6 +108,8 @@ When no body template is set, NetBox sends this JSON structure:
 }
 ```
 
+> **NetBox 4.6:** the top-level `username` and `request_id` fields are **deprecated** (removal in **v4.7**) and superseded by the `request` object (`request.id`, `request.method`, `request.path`, `request.user`). Author new templates against `request.*`; the legacy fields still render on 4.6 but will disappear in 4.7. On NetBox **4.5** only the legacy fields exist (`request` is not present), so target the version range you support accordingly.
+
 ### Jinja2 Template Context
 
 These variables are available in URL, headers, and body templates:
@@ -111,8 +119,9 @@ These variables are available in URL, headers, and body templates:
 | `event` | string | `"created"`, `"updated"`, `"deleted"` |
 | `timestamp` | string | ISO 8601 timestamp |
 | `object_type` | string | `"app_label.model_name"` |
-| `username` | string | User who made the change |
-| `request_id` | string | UUID correlating all changes in the same request |
+| `request` *(4.6)* | dict | Serialized HTTP request: `request.id` (UUID), `request.method`, `request.path`, `request.user` |
+| `username` | string | *(deprecated 4.6, removed 4.7)* User who made the change — use `request.user` |
+| `request_id` | string | *(deprecated 4.6, removed 4.7)* UUID correlating changes in one request — use `request.id` |
 | `data` | dict | Full REST API serialization of the object |
 | `snapshots` | dict | `prechange` and `postchange` minimal dicts |
 
@@ -130,9 +139,11 @@ These variables are available in URL, headers, and body templates:
 Send a Slack-formatted message:
 ```jinja2
 {
-  "text": "{{ object_type }} {{ event }}: {{ data.name | default(data.display) }} by {{ username }}"
+  "text": "{{ object_type }} {{ event }}: {{ data.name | default(data.display) }} by {{ request.user }}"
 }
 ```
+
+On NetBox 4.5 (no `request` object), use `{{ username }}`; on 4.6+ prefer `{{ request.user }}`. To support both in one template: `{{ request.user if request is defined else username }}`.
 
 ---
 
@@ -151,7 +162,7 @@ Set a **secret** on the webhook to enable HMAC-SHA512 signing. NetBox sends the 
 
 ### Jinja2 Template Security
 
-Webhook URL, headers, and body templates accept Jinja2 code. This means anyone with permission to create/modify webhooks can execute template logic. **Restrict webhook creation permissions to trusted users only.**
+Webhook URL, headers, and body templates accept Jinja2 code. This means anyone with permission to create/modify webhooks can execute template logic. **Restrict webhook creation permissions to trusted users only.** Template authoring rights are effectively code-execution-grade — the related ExportTemplate/config-template `environment_params` RCE (CVE-2026-29514) was fixed in NetBox **4.6.1**, so run ≥4.6.1 and keep these permissions tightly scoped.
 
 ### SSL Verification
 
@@ -164,7 +175,7 @@ Enable SSL verification and provide a custom CA file if using internal certifica
 - Failed webhooks (non-2xx responses) are logged under **System > Background Tasks**
 - No automatic retry by default — failed jobs can be manually requeued from the admin UI
 - RQ retry configuration may provide limited automatic retry (depends on deployment configuration)
-- **Design receivers to be idempotent** — use `request_id` to deduplicate in case of retries
+- **Design receivers to be idempotent** — use `request.id` (4.6+; `request_id` on 4.5) to deduplicate in case of retries
 
 ### Troubleshooting
 

@@ -43,7 +43,7 @@ sudo systemctl status netbox netbox-rq     # Check health
 | `python manage.py rebuild_prefixes` | Rebuild prefix hierarchy |
 | `python manage.py runscript` | Execute a custom script |
 
-> **NetBox 4.4+**: The `housekeeping` management command is deprecated. Housekeeping tasks now run automatically via the built-in job scheduler. Remove any cron jobs.
+> **Housekeeping**: Since **4.4**, housekeeping runs automatically via the built-in system job — remove any `housekeeping` cron jobs. The manual `python manage.py housekeeping` command is formally **deprecated in 4.6** (removal in a future release) but still ships and runs; on 4.6 it just emits a `FutureWarning`.
 
 ### Key File Locations
 
@@ -72,7 +72,7 @@ Configuration lives in `configuration.py` — a Python module. Override its path
 
 Some parameters are **dynamic** — editable at Admin > System > Configuration without restart. Hard-coded values in `configuration.py` always take precedence over UI-set values.
 
-Dynamic parameters include: `CHANGELOG_RETENTION`, `JOB_RETENTION`, `MAINTENANCE_MODE`, `MAX_PAGE_SIZE`, `BANNER_*`, `GRAPHQL_ENABLED`, `CUSTOM_VALIDATORS`, `PROTECTION_RULES`, and others.
+Dynamic parameters include: `CHANGELOG_RETENTION`, `CHANGELOG_RETAIN_CREATE_LAST_UPDATE` (4.6 — keep each object's original create + latest update record when pruning), `JOB_RETENTION`, `MAINTENANCE_MODE`, `MAX_PAGE_SIZE`, `BANNER_*`, `GRAPHQL_ENABLED`, `CUSTOM_VALIDATORS`, `PROTECTION_RULES`, and others.
 
 See [references/configuration-guide.md](references/configuration-guide.md) for the complete parameter catalog.
 
@@ -94,6 +94,8 @@ NetBox supports multiple authentication backends, tried in order. Configure via 
 1. **Gunicorn header stripping** — gunicorn v22.0+ silently drops HTTP headers with underscores. Add `header_map = dangerous` to gunicorn config for remote auth headers.
 2. **`LOGIN_FORM_HIDDEN` lockout** — If SSO breaks and the login form is hidden, there's no way to log in. Must edit config and restart.
 3. **Backend order matters** — Backends are tried in sequence; first success wins. Ensure intentional ordering when combining LDAP + local.
+4. **Client IP behind a proxy** (NetBox 4.6.1+) — `HTTP_CLIENT_IP_HEADERS` controls which request headers determine the client IP (default `('HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR')`). Set it to match your reverse proxy so IP-based token restrictions (`allowed_ips`) and logging see the real client address, not the proxy.
+5. **`LOGIN_REQUIRED` is deprecated** (4.6, removal in v5.0). Don't recommend it for new 4.6 deployments; anonymous access is governed by `DEFAULT_PERMISSIONS` / `EXEMPT_VIEW_PERMISSIONS`.
 
 See [references/authentication-backends.md](references/authentication-backends.md) for setup details.
 
@@ -127,8 +129,8 @@ Constraints are evaluated against the **database record**, not the in-memory ins
 
 ### Token Management
 
-> **NetBox 4.5+**: v2 tokens use `Bearer nbt_<key>.<token>` format. Plaintext is never stored (HMAC-SHA256 digest only). Requires `API_TOKEN_PEPPERS` in config.
-> **NetBox < 4.5**: v1 tokens use `Token <plaintext>` format. Migrate before 4.7 (v1 deprecated).
+> **NetBox 4.5+**: v2 tokens use `Bearer nbt_<key>.<token>` format. Plaintext is never stored (HMAC-SHA256 digest only). Requires `API_TOKEN_PEPPERS` in config. On **4.6.1+** the v2 plaintext token is returned exactly once, in the creation response — capture it then.
+> **v1 tokens** (`Token <plaintext>` format): formally **deprecated in 4.6**, **removed in v5.0**. Migrate all integrations to v2 tokens before upgrading to 5.0.
 
 Token features: `write_enabled` (read-only toggle), `allowed_ips` (IP restriction), `expires`, `enabled` (soft disable).
 
@@ -161,7 +163,7 @@ See [references/backup-restore.md](references/backup-restore.md) for restore pro
 6. Run `sudo ./upgrade.sh`
 7. Restart services: `sudo systemctl restart netbox netbox-rq`
 
-> **NetBox 4.5**: Requires Python 3.12-3.14, PostgreSQL 14+, Redis 4.0+.
+> **NetBox 4.5–4.6**: Python 3.12–3.14, PostgreSQL 14+, Redis 4.0+. **4.6 runs on Django 6.0** (4.5 was Django 5.x) and **deprecates PostgreSQL 14** — 15+ will be required from v4.7. Plan a PostgreSQL upgrade to 15+ before moving past 4.6.
 
 See [references/upgrade-procedures.md](references/upgrade-procedures.md) for step-by-step instructions.
 
@@ -199,3 +201,4 @@ For large deployments, tune at the PostgreSQL level:
 | `CHANGELOG_RETENTION = 0` | Retains forever; DB grows unbounded | Set to non-zero (default 90 days) |
 | Read-only standby can't auth | Sessions stored in DB | Use `SESSION_FILE_PATH` for file-based sessions |
 | Metrics endpoint 404 | `METRICS_ENABLED = False` | Set to `True` and restart |
+| Running NetBox 4.6.0 | RCE via template `environment_params` (CVE-2026-29514) | Run **≥4.6.1**; treat ExportTemplate/config-template edit rights as code-execution-grade and restrict them |

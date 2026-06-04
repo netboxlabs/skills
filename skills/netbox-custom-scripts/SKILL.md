@@ -129,7 +129,7 @@ All variables support: `label`, `description`, `default`, `required` (default `T
 | `BooleanVar` | — | Always optional internally |
 | `ChoiceVar` | `choices` (list of `(value, label)`) | Blank choice auto-added |
 | `MultiChoiceVar` | `choices` | Multiple selection |
-| `ObjectVar` | `model`, `query_params`, `null_option` | Dynamic API-backed dropdown |
+| `ObjectVar` | `model`, `query_params`, `null_option`, `selector`, `quick_add` | Dynamic API-backed dropdown. `selector` (4.5+) shows an advanced object-picker; `quick_add` (4.6.2+) adds an inline "create new" button |
 | `MultiObjectVar` | Same as `ObjectVar` | Multiple objects |
 | `FileVar` | — | File upload (only available during execution) |
 | `IPAddressVar` | — | IPv4/IPv6 without mask |
@@ -216,6 +216,8 @@ Scripts run as background jobs via Django-RQ:
 - **Scheduling**: Set `schedule_at` for future execution, `interval` for recurrence
 - **Timeout**: Controlled by `Meta.job_timeout` or global `RQ_DEFAULT_TIMEOUT`
 
+> **NetBox 4.6 background-job changes:** completion **notifications are disabled for scripts running in the background** (4.6) — don't rely on a UI notification to signal a scheduled run finished; check job status instead. NetBox **4.6.2** also prevents **duplicate scheduled background jobs** (re-submitting an already-queued recurring job no longer stacks duplicates).
+
 See [references/execution-model.md](references/execution-model.md) for job lifecycle details.
 
 ### Job States
@@ -267,3 +269,4 @@ If `run()` is not overridden, NetBox executes `pre_run()` → all `test_*` metho
 - Each file becomes a `ScriptModule`; classes auto-discovered
 - Removing a class from a file soft-deletes its DB record if job history exists (`is_executable=False`)
 - Storage backend configurable via Django `STORAGES` (supports S3)
+- Scripts can also be synced from a remote **DataSource** (git/S3); on NetBox **4.6.2+** remote-source scripts are **validated on sync**, so a malformed script is caught at sync time rather than first execution

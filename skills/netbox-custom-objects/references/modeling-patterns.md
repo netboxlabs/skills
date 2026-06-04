@@ -34,7 +34,7 @@ Connect two core objects that don't have a built-in relationship.
 
 // Fields
 {"name": "device", "label": "Device", "type": "object", "app_label": "dcim", "model": "device", "required": true}
-{"name": "application", "label": "Application", "type": "object", "app_label": "netbox_custom_objects", "model": "table1model", "required": true}  // model = table{cot_id}model
+{"name": "application", "label": "Application", "type": "object", "app_label": "custom-objects", "model": "applications", "required": true}  // v0.5+: model = target COT slug
 {"name": "role", "label": "Role", "type": "select", "choice_set": <id>}  // primary/secondary/dr
 ```
 
@@ -65,7 +65,7 @@ Model parent-child relationships within the same type.
 // Fields
 {"name": "code", "label": "Code", "type": "text", "primary": true, "required": true, "unique": true}
 {"name": "description", "label": "Description", "type": "longtext"}
-{"name": "parent", "label": "Parent Cost Center", "type": "object", "app_label": "netbox_custom_objects", "model": "table3model"}  // self-ref: same COT id
+{"name": "parent", "label": "Parent Cost Center", "type": "object", "app_label": "custom-objects", "model": "cost-centers"}  // v0.5+: self-ref uses the COT's own slug
 {"name": "budget", "label": "Annual Budget", "type": "decimal", "validation_minimum": 0}
 ```
 

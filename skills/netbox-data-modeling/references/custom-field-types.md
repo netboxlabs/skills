@@ -1,6 +1,6 @@
 # Custom Field Types
 
-All custom field types available in NetBox 4.5+ with validation options, API format, and use cases.
+All custom field types available in NetBox 4.6 (the same 13 types ship on 4.5) with validation options, API format, and use cases.
 
 ## Field Types
 
@@ -63,6 +63,8 @@ Selection and multi-selection fields require a **CustomFieldChoiceSet**:
 
 Choice sets can be reused across multiple custom fields.
 
+**NetBox 4.6** adds optional per-choice **colors**: each `extra_choices` entry may carry a third element — `["production", "Production", "4caf50"]` — so selection/multiselect values render as colored badges. Two-element `[value, label]` pairs remain valid (no color).
+
 ## Configuration Options
 
 | Option | Values | Purpose |
@@ -75,6 +77,7 @@ Choice sets can be reused across multiple custom fields.
 | `required` | boolean | Make field mandatory |
 | `default` | varies | Pre-populated value for new objects |
 | `search_weight` | integer | Weight in global search (0 = excluded) |
+| `validation_schema` *(4.6)* | JSON Schema object | Validate **json**-type field values against a JSON Schema (replaces ad-hoc validation) |
 
 ## Guidelines
 

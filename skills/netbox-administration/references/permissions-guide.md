@@ -72,13 +72,14 @@ Default value grants token self-management:
 
 - 40-character plaintext stored in database
 - Header: `Authorization: Token <plaintext>`
-- **Deprecated in 4.7** — migrate to v2
+- **Deprecated in 4.6, removed in v5.0** — migrate to v2 before upgrading past 4.x
 
 ### v2 Tokens (4.5+)
 
 - Key (short ID) + HMAC-SHA256 digest stored; plaintext **never** stored
 - Header: `Authorization: Bearer nbt_<key>.<token>`
 - Requires `API_TOKEN_PEPPERS` in configuration
+- On **4.6.1+** the plaintext token is returned once, in the creation response — capture it then; it cannot be retrieved later
 
 ### Token Features
 

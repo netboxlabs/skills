@@ -96,6 +96,16 @@ site = ObjectVar(
 )
 ```
 
+**Picker options:**
+
+```python
+device = ObjectVar(
+    model=Device,
+    selector=True,      # 4.5+: advanced object-selection widget (filterable picker dialog)
+    quick_add=True,     # 4.6.2+: inline "create new" button to add a missing object without leaving the form
+)
+```
+
 ### MultiObjectVar
 
 Same options as `ObjectVar`, allows multiple selection.

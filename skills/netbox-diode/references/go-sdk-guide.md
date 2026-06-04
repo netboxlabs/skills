@@ -6,12 +6,12 @@
 go get github.com/netboxlabs/diode-sdk-go
 ```
 
-**Requirements:** Go 1.24+
+**Requirements:** Go 1.24+ (diode-sdk-go v1.9.0)
 
 ## Client Setup
 
 ```go
-import diode "github.com/netboxlabs/diode-sdk-go"
+import diode "github.com/netboxlabs/diode-sdk-go/diode"  // exported types live in the diode/ subpackage
 
 client, err := diode.NewClient(
     "grpc://localhost:8080/diode",  // grpc:// = insecure, grpcs:// = TLS
@@ -154,7 +154,7 @@ package main
 import (
     "context"
     "log"
-    diode "github.com/netboxlabs/diode-sdk-go"
+    diode "github.com/netboxlabs/diode-sdk-go/diode"
 )
 
 func main() {

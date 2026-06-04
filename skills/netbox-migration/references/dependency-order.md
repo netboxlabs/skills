@@ -44,7 +44,8 @@ Objects must be created in dependency order — a Device can't reference a Site 
 
 | Object | API Endpoint | Required Fields | Dependencies |
 |---|---|---|---|
-| Rack | `/api/dcim/racks/` | name, site | site, location, role, tenant (optional) |
+| RackGroup *(4.6)* | `/api/dcim/rack-groups/` | name, slug | — (flat organizational grouping) |
+| Rack | `/api/dcim/racks/` | name, site | site, location, role, **group (RackGroup, 4.6)**, tenant (optional) |
 
 ### Tier 6: Device Taxonomy
 
@@ -93,7 +94,8 @@ After creating IPs and assigning to interfaces, **update Device.primary_ip4/prim
 | Provider | `/api/circuits/providers/` | name, slug | — |
 | CircuitType | `/api/circuits/circuit-types/` | name, slug | — |
 | Circuit | `/api/circuits/circuits/` | cid, provider, type | provider, type |
-| Cable | `/api/dcim/cables/` | a_terminations, b_terminations | endpoints (interfaces, etc.) |
+| CableBundle *(4.6)* | `/api/dcim/cable-bundles/` | name | — (create before cables that reference it) |
+| Cable | `/api/dcim/cables/` | a_terminations, b_terminations | endpoints (interfaces, etc.); **bundle (CableBundle, 4.6, optional)** |
 
 ### Tier 11: Virtualization & Enrichment
 
@@ -101,8 +103,9 @@ After creating IPs and assigning to interfaces, **update Device.primary_ip4/prim
 |---|---|---|---|
 | ClusterType | `/api/virtualization/cluster-types/` | name, slug | — |
 | ClusterGroup | `/api/virtualization/cluster-groups/` | name, slug | — |
+| VirtualMachineType *(4.6)* | `/api/virtualization/virtual-machine-types/` | name, slug | — |
 | Cluster | `/api/virtualization/clusters/` | name, type | type, group, site (optional) |
-| VirtualMachine | `/api/virtualization/virtual-machines/` | name | cluster or site, role, platform, tenant (optional) |
+| VirtualMachine | `/api/virtualization/virtual-machines/` | name | cluster or site, role, platform, **virtual_machine_type (4.6)**, tenant (optional) |
 | VMInterface | `/api/virtualization/interfaces/` | virtual_machine, name | virtual_machine |
 | ConfigContext | `/api/extras/config-contexts/` | name, data | — |
 

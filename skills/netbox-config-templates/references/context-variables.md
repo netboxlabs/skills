@@ -144,8 +144,10 @@ Templates run in `jinja2.sandbox.SandboxedEnvironment`. You **cannot**:
 
 ### Available Filters
 
-Only standard Jinja2 built-in filters are available by default:
+The standard Jinja2 built-in filters are available:
 `abs`, `attr`, `batch`, `capitalize`, `center`, `default`, `dictsort`, `escape`, `filesizeformat`, `first`, `float`, `forceescape`, `format`, `groupby`, `indent`, `int`, `items`, `join`, `last`, `length`, `list`, `lower`, `map`, `max`, `min`, `pprint`, `random`, `reject`, `rejectattr`, `replace`, `reverse`, `round`, `safe`, `select`, `selectattr`, `slice`, `sort`, `string`, `striptags`, `sum`, `title`, `trim`, `truncate`, `unique`, `upper`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`.
+
+**NetBox 4.6.2+** adds a built-in **`env()`** filter that returns a system environment variable's value: `{{ 'WEBHOOK_TOKEN_3' | env }}`. It only resolves names matched by the `JINJA_ENVIRONMENT_PARAMS` config allowlist (fnmatch wildcards); any other name returns `None`. On 4.6.1 and earlier, only the standard filters above are built in.
 
 Custom filters can be registered in NetBox configuration:
 
@@ -169,3 +171,5 @@ Each template can customize Jinja2 behavior via `environment_params` (JSON field
 ```
 
 `StrictUndefined` is recommended for production templates — raises errors on undefined variables instead of silently rendering empty strings.
+
+> **NetBox 4.6.1+ — allowlist (CVE-2026-29514).** `environment_params` keys are restricted to a fixed allowlist (`JINJA_ENV_PARAMS_ALLOWED`) after an RCE fix shared by ConfigTemplate and ExportTemplate. The delimiter/whitespace/scalar params (incl. `trim_blocks`, `lstrip_blocks`, `autoescape`, `keep_trailing_newline`) are allowed, and `undefined` must be one of `jinja2.StrictUndefined`, `jinja2.Undefined`, `jinja2.ChainableUndefined`, `jinja2.DebugUndefined`. **`extensions`, `finalize`, `loader`, and `bytecode_cache` are blocked** — a template setting them is rejected. The example above remains valid.

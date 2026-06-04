@@ -46,16 +46,18 @@ Use the Diode SDK (Python or Go) to programmatically push entity data from any s
 
 ```python
 from netboxlabs.diode.sdk import DiodeClient
-from netboxlabs.diode.sdk.ingester import Device, Interface
+from netboxlabs.diode.sdk.ingester import Device, Interface, Entity
 
 with DiodeClient(
     target="grpc://diode-service:8081",
     app_name="my-custom-source",
     app_version="1.0.0",
 ) as client:
+    # Wrap each object in Entity(); related objects use string shorthand
+    # (site="NYC" → Site(name="NYC"), device="switch-01" → Device(name="switch-01"))
     entities = [
-        Device(name="switch-01", site={"name": "NYC"}, role={"name": "Access Switch"}),
-        Interface(name="eth0", device={"name": "switch-01"}, type="1000base-t"),
+        Entity(device=Device(name="switch-01", site="NYC", role="Access Switch")),
+        Entity(interface=Interface(name="eth0", device="switch-01", type="1000base-t")),
     ]
     client.ingest(entities=entities)
 ```
@@ -76,6 +78,8 @@ Any entity type the ingestion pipeline can represent is eligible for comparison.
 | `ipam.prefix` | Prefix, status, site, VLAN |
 
 The specific fields compared depend on what the data source provides. If a data source only sends device name and serial number, only those fields are compared.
+
+> The set of comparable object types tracks what the Diode SDK can represent — as the SDK adds entities (e.g. the NetBox 4.6 additions like CableBundle, RackGroup, and VirtualMachineType), those types become eligible for drift detection too. Check the current Diode SDK entity catalog for the authoritative list.
 
 ## Data Source Selection Guide
 

@@ -37,7 +37,9 @@ The **netbox_changes** plugin adds a code-review-style workflow on top of
 [NetBox Branching](../netbox-branching/SKILL.md). Every branch can have one
 Change Request (CR) that gates merge via policies and reviews.
 
-**Plugin:** `netbox_changes` 0.4.x · **NetBox:** 4.4–4.6 · **Base URL:** `/api/plugins/changes/`
+**Plugin:** `netbox_changes` 1.0.x (latest v1.0.1) · **NetBox:** 4.4–4.6 · **Base URL:** `/api/plugins/changes/`
+
+> **Plugin v1.0+** changed CR lifecycle semantics vs the 0.4.x line: a branch may hold multiple CRs (one *active* at a time), rejected CRs can be reopened/replaced, `policy` is required, and `changes-requested` is a settable status under an unmet policy. These are flagged inline below.
 
 ## Quick Reference
 
@@ -62,11 +64,11 @@ Change Request (CR) that gates merge via policies and reviews.
 
 ## Core Concepts
 
-### One CR Per Branch
+### One *Active* CR Per Branch
 
-Each branch can have **at most one** change request. Creating a second CR
-for the same branch raises an integrity error. Branch deletion cascades to CR
-deletion.
+> **Plugin v1.0+**: a branch may have **multiple** change requests over time, but only **one active** at a time (any status except `completed` or `rejected`). Creating a second *active* CR for a branch fails with a `ValidationError`: `"This branch already has an active change request."` Once a CR is `rejected` or `completed`, the slot frees up — you can open a fresh CR (or reopen the rejected one) for the same branch. Branch deletion cascades to CR deletion.
+>
+> (In 0.4.x the branch↔CR relation was strictly one-to-one and a second CR raised an `IntegrityError` — do not rely on that against v1.0+.)
 
 ### Author/Owner Fields Are Read-Only
 
@@ -111,11 +113,14 @@ Most transitions happen **automatically**:
 | Branch merged | `approved` → `completed` (requires merge to complete successfully with actual changes) |
 | Policy rule changed or deleted, policy no longer met | `approved` → `needs-review` |
 
-**Manual transitions:** Users can set `draft`, `needs-review`, or `rejected`
-directly. You **cannot** manually set `approved` — it's only reachable when
-the policy passes. `completed` is only set automatically on merge.
-`changes-requested` is also auto-only — it's set when a reviewer submits
-a "changes-requested" review, not via direct PATCH.
+**Manual transitions:** Users can set `draft`, `needs-review`, `changes-requested`,
+or `rejected` directly while the policy is unmet (the valid manual set is
+`draft` / `needs-review` / `changes-requested` / `rejected`). You **cannot**
+manually set `approved` — it's only reachable when the policy passes.
+`completed` is only set automatically on merge. A reviewer submitting a
+"changes-requested" review also moves the CR to `changes-requested`.
+
+> **Plugin v1.0+**: `changes-requested` is now a valid *manual* status under an unmet policy (in 0.4.x it was auto-only). A `rejected` CR is no longer a dead end — it can be reopened (set back to `draft`/`needs-review`) or replaced by a new CR on the same branch.
 
 See [references/cr-lifecycle.md](references/cr-lifecycle.md) for the complete
 transition table.
@@ -135,8 +140,8 @@ POST /api/plugins/changes/change-requests/
 ```
 
 - `owner` is set automatically — do NOT include it
-- `branch` is the branch PK (must exist, must not already have a CR)
-- `policy` is optional but required for merge gating to pass
+- `branch` is the branch PK (must exist, must not already have an *active* CR)
+- `policy` is **required** (v1.0+) — a non-null FK on every CR; a POST without `policy` fails. (It also drives merge gating.)
 - `priority` is an integer (1=low, 5=high)
 
 ## Review Workflow
@@ -213,7 +218,7 @@ PLUGINS_CONFIG = {
 }
 ```
 
-- **Bypass permission:** `netbox_changes.bypass_policy` allows direct main writes
+- **Bypass permission (v1.0+):** grant the **`bypass`** custom action on the **Policy** object (NetBox Change Management → Policy in the ObjectPermission form). Superusers get it implicitly. Describe it as "the bypass action on Policy" rather than a single flat permission string — internally the codename is `bypass` while the enforcement check still references `bypass_policy`.
 - During branch merge/revert, protect_main is temporarily suspended
 - Error when blocked: `"Changes directly to main are not permitted."`
 
@@ -248,7 +253,7 @@ GET /api/plugins/changes/policy-rules/?policy_id=1
 1. **Status names** use hyphens: `needs-review`, `changes-requested` (not underscores)
 2. **Owner/user/author** fields — read-only, set automatically. Don't POST them.
 3. **Zero-rule policy** — always fails. Add at least one enabled rule.
-4. **One CR per branch** — second CR = integrity error.
+4. **One *active* CR per branch** (v1.0+) — a second *active* CR fails with a ValidationError; a rejected/completed CR frees the slot.
 5. **Merge gating is mandatory** — no toggle, always active when plugin installed
 6. **protect_main is OFF by default** — must explicitly enable in config
 7. **`approved` is not manually settable** — only reached via policy satisfaction

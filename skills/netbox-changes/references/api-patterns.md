@@ -19,8 +19,8 @@ POST /api/plugins/changes/change-requests/
 ```
 
 - `owner` is set automatically to the current user — do NOT include
-- `branch` — PK of an existing branch (must not already have a CR)
-- `policy` — PK of a Policy (optional but needed for merge gating)
+- `branch` — PK of an existing branch (must not already have an *active* CR; v1.0+)
+- `policy` — PK of a Policy. **Required (v1.0+)** — a non-null FK on every CR; a POST without `policy` fails. Also drives merge gating.
 - `status` — must be `draft` or `needs-review` (initial choices only)
 - `priority` — integer 1 (low) to 5 (high)
 

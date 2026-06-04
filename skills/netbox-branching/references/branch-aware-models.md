@@ -31,7 +31,7 @@ These models are **global** — changes are immediate and affect all branches:
 
 ## Identifying Branchable Models
 
-> **Note:** Some versions of netbox-branching (e.g., 0.8.x) expose a `GET /api/plugins/branching/branchable-models/` endpoint that lists all branchable models. This endpoint is **not available in all versions** — it may return 404. Do not depend on it.
+> **Tip:** `GET /api/plugins/branching/branchable-models/` lists all branchable models on your install — the authoritative source. It ships across the supported 4.4.1+ / plugin 1.0.x range (some older 0.8.x builds returned 404). Prefer it over the heuristics below when you need certainty.
 
 **In practice, the rule is simple:**
 

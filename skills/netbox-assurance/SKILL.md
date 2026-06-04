@@ -3,7 +3,7 @@ name: netbox-assurance
 description: >
   NetBox Assurance drift detection and deviation management. Use when working with
   network state comparison, deviation review/remediation, data source configuration,
-  or understanding how intended vs actual network state is reconciled in NetBox Enterprise.
+  or understanding how intended vs actual network state is reconciled in NetBox Cloud and Enterprise.
 license: Apache-2.0
 ---
 
@@ -234,11 +234,11 @@ Assign these through NetBox's standard user/group permission system.
 
 ## Prerequisites
 
-- **NetBox Enterprise 1.10+** with Assurance license
+- **NetBox Cloud or NetBox Enterprise** with Assurance enabled (on Enterprise, your license file determines whether Assurance services are installed; on Cloud it's a licensed add-on). The Assurance plugin supports NetBox **4.4.10 through 4.6.x** (current plugin line v1.5.x).
 - At least one configured data source
 - Network connectivity between data sources and the Assurance service
 
-> Assurance is an Enterprise-only feature. It is not available in the open-source NetBox Community Edition.
+> Assurance is an optional, licensed add-on for **NetBox Cloud and NetBox Enterprise** — it is not part of open-source NetBox Community.
 
 ## Troubleshooting
 

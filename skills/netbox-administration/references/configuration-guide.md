@@ -22,7 +22,7 @@
 | `EXEMPT_VIEW_PERMISSIONS` | `[]` | Models viewable without auth (`['*']` for most) |
 | `LOGIN_FORM_HIDDEN` | `False` | Hide login form (SSO-only deployments) |
 | `LOGIN_PERSISTENCE` | `False` | Reset session TTL on each request (causes DB writes) |
-| `LOGIN_REQUIRED` | `True` (since 4.0.2) | Require auth for all access |
+| `LOGIN_REQUIRED` | `True` (since 4.0.2) | Require auth for all access. **Deprecated in 4.6, removed in v5.0** — govern anonymous access via `DEFAULT_PERMISSIONS` / `EXEMPT_VIEW_PERMISSIONS` instead |
 | `LOGIN_TIMEOUT` | 1209600 (14 days) | Session cookie lifetime in seconds |
 | `SECURE_HSTS_SECONDS` | 0 | HSTS header duration |
 | `SECURE_SSL_REDIRECT` | `False` | Force HTTPS redirect |
@@ -55,6 +55,7 @@
 | `DEFAULT_LANGUAGE` | `'en-us'` | UI language |
 | `EMAIL` | localhost:25 | Email server (SERVER, PORT, USERNAME, PASSWORD, USE_SSL, USE_TLS, FROM_EMAIL) |
 | `HOSTNAME` | system hostname | Display name in UI (4.4+) |
+| `HTTP_CLIENT_IP_HEADERS` | `('HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR')` | Request headers checked (in order) to determine client IP (4.6.1+). Set to match your reverse proxy so `allowed_ips` token restrictions and logging see the real client address |
 | `HTTP_PROXIES` | `None` | Outbound proxy config |
 | `ISOLATED_DEPLOYMENT` | `False` | Disables internet-dependent features |
 | `LOGGING` | `{}` | Django logging config |
@@ -76,4 +77,4 @@ For `LOGGING` config: `netbox.auth.*`, `netbox.api.views.*`, `netbox.event_rules
 
 These can be changed at Admin > System > Configuration without restart. Hard-coded values in `configuration.py` take precedence.
 
-`BANNER_*`, `CHANGELOG_RETENTION` (default 90 days), `JOB_RETENTION` (default 90 days), `MAINTENANCE_MODE`, `MAX_PAGE_SIZE` (default 1000), `PAGINATE_COUNT`, `GRAPHQL_ENABLED`, `CUSTOM_VALIDATORS`, `PROTECTION_RULES`, `ENFORCE_GLOBAL_UNIQUE`, `ALLOWED_URL_SCHEMES`, `DEFAULT_USER_PREFERENCES`, `MAPS_URL`, `PREFER_IPV4`
+`BANNER_*`, `CHANGELOG_RETENTION` (default 90 days), `CHANGELOG_RETAIN_CREATE_LAST_UPDATE` (4.6 — when pruning per `CHANGELOG_RETENTION`, retain each object's original create + most-recent-update change record), `JOB_RETENTION` (default 90 days), `MAINTENANCE_MODE`, `MAX_PAGE_SIZE` (default 1000), `PAGINATE_COUNT`, `GRAPHQL_ENABLED`, `CUSTOM_VALIDATORS`, `PROTECTION_RULES`, `ENFORCE_GLOBAL_UNIQUE`, `ALLOWED_URL_SCHEMES`, `DEFAULT_USER_PREFERENCES`, `MAPS_URL`, `PREFER_IPV4`

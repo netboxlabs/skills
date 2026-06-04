@@ -143,7 +143,7 @@ Response:
 }
 ```
 
-> **Important (v0.4.x):** Field-level validation (`required`, `validation_regex`, `validation_minimum/maximum`) is enforced in the UI but **not via the REST API**. Your API client must validate data before submission.
+> **Plugin v0.5+:** Field-level validation (`required`, `validation_regex`, `validation_minimum/maximum`) is enforced on **REST API writes** as well as in the UI, and NetBox's `CUSTOM_VALIDATORS` (keyed `netbox_custom_objects.<cot-slug>`) is honored. Expect a 400 with field errors on invalid input. (In 0.4.x these were UI-only — do not assume the API skips validation.)
 
 ### 5. Query and Filter
 

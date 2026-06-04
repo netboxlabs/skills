@@ -44,6 +44,7 @@ Follow this checklist when auditing a NetBox data model:
 | HIER-3 | Every device should be in a Site (never orphaned at top level) | High |
 | HIER-4 | Racks should have a Location when the site has locations defined | Medium |
 | HIER-5 | Don't create single-child hierarchies — they add complexity without value | Low |
+| HIER-6 | On 4.6+, **RackGroups** offer a flat, cross-location way to group racks (e.g. "cage-7", "cold-aisle-B") independent of the Location tree — use them when rack grouping doesn't map cleanly onto site/location nesting, not as a substitute for Locations | Low |
 
 ### IPAM (IPAM)
 
@@ -53,8 +54,8 @@ Follow this checklist when auditing a NetBox data model:
 | IPAM-2 | Prefixes should nest correctly (child within parent CIDR) | High |
 | IPAM-3 | Use VRFs to separate overlapping address spaces — never duplicate prefixes in global table | Critical |
 | IPAM-4 | IP Addresses must have prefix length (`/32` for loopbacks, actual mask for interfaces) | High |
-| IPAM-5 | Use Roles to classify prefix purpose (infrastructure, customer, management) | Medium |
-| IPAM-6 | VLANs should be in VLAN Groups scoped to site or location | Medium |
+| IPAM-5 | Use Roles to classify prefix purpose (infrastructure, customer, management); on NetBox 4.6+ **ASNs can also carry a Role** — use it to classify ASN purpose | Medium |
+| IPAM-6 | VLANs should be in VLAN Groups with an appropriate **scope**. Scope can be Region/SiteGroup/Site/Location/Rack/ClusterGroup/Cluster (and **RackGroup** on 4.6+) — don't assume site/location are the only options; pick the tightest scope that matches the VLANs' reuse boundary | Medium |
 
 ### Device Modeling (DEV)
 
@@ -77,6 +78,7 @@ Follow this checklist when auditing a NetBox data model:
 | EXT-5 | Never store structured data (JSON, lists) in description or comments fields | High |
 | EXT-6 | Don't create custom fields that duplicate built-in fields (e.g., custom "location" field) | High |
 | EXT-7 | Prefer custom objects over dozens of custom fields when the data is really a related entity | Medium |
+| EXT-8 | On 4.6+, attach a **`validation_schema`** (JSON Schema) to JSON custom fields to enforce structure instead of leaving them free-form; flag JSON fields holding structured data with no schema | Medium |
 
 ### Naming (NAME)
 

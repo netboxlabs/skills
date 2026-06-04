@@ -37,13 +37,20 @@ Users can set these statuses directly via API/UI:
 |----|-------------|
 | `draft` | Always (if policy unmet) |
 | `needs-review` | Always (if policy unmet) |
-| `changes-requested` | **Not directly settable** — only via auto-transition when a reviewer submits a "changes-requested" review |
+| `changes-requested` | Always (if policy unmet) — see v1.0+ note below |
 | `rejected` | Always (if policy unmet) |
 | `approved` | **Only when policy is satisfied** — enforced by status validation |
 | `completed` | **Never manually** — only set automatically on merge |
 
 When policy is NOT met, valid choices are restricted to:
-`draft`, `needs-review`, `rejected`.
+`draft`, `needs-review`, `changes-requested`, `rejected`.
+
+> **Plugin v1.0+**: `changes-requested` is now directly settable under an unmet
+> policy (in 0.4.x it was auto-only, reachable solely when a reviewer submitted a
+> "changes-requested" review). A reviewer's "changes-requested" review still moves
+> the CR to that status automatically. A `rejected` CR is also no longer terminal —
+> it can be reopened by setting it back to `draft`/`needs-review`, or replaced by a
+> new CR on the same branch.
 
 ## State Diagram
 
