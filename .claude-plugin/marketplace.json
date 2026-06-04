@@ -9,7 +9,7 @@
     {
       "name": "netbox-labs",
       "source": "./",
-      "description": "Skills for the NetBox ecosystem — data modeling, API integration, plugin development, change management, discovery, assurance, automation, and migration."
+      "description": "Skills for the NetBox ecosystem — data modeling, API integration, plugin development, change management, discovery, assurance, validation, asset lifecycle, data exchange, agent/MCP integration, automation, and migration."
     }
   ]
 }

@@ -23,6 +23,7 @@ This is the entry point for all NetBox-related tasks. Use the decision trees bel
 - Query or write data via REST/GraphQL → [netbox-api-integration](../netbox-api-integration/SKILL.md)
 - Bulk ingest data via gRPC (Diode SDK) → [netbox-diode](../netbox-diode/SKILL.md)
 - Automate with webhooks, Ansible, Terraform → [netbox-automation-patterns](../netbox-automation-patterns/SKILL.md)
+- Drive NetBox from an AI agent via the Platform MCP server → [netboxlabs-platform-mcp](../netboxlabs-platform-mcp/SKILL.md)
 
 **Extend NetBox?**
 - Build a plugin (models, views, APIs) → [netbox-plugin-development](../netbox-plugin-development/SKILL.md)
@@ -40,6 +41,12 @@ This is the entry point for all NetBox-related tasks. Use the decision trees bel
 **Discover or audit your network?**
 - Auto-discover infrastructure with Orb Agent → [netbox-discovery](../netbox-discovery/SKILL.md)
 - Detect drift between intended and actual state → [netbox-assurance](../netbox-assurance/SKILL.md)
+
+**Procure or spare equipment?**
+- Track procurement (BOMs, POs, shipments) and spares → [netbox-asset-lifecycle](../netbox-asset-lifecycle/SKILL.md)
+
+**Look up hardware specs or lifecycle data?**
+- Consume device-type metadata and enrichment (EOL, thermal, protocols) → [netbox-ndx](../netbox-ndx/SKILL.md)
 
 **Operate or migrate?**
 - Configure, secure, or tune a NetBox server → [netbox-administration](../netbox-administration/SKILL.md)
@@ -68,6 +75,9 @@ This is the entry point for all NetBox-related tasks. Use the decision trees bel
 | [netbox-discovery](../netbox-discovery/SKILL.md) | Platform | Orb Agent — config, backends, policies, secrets |
 | [netbox-validation](../netbox-validation/SKILL.md) | Platform | Validation policies, compliance checks, findings, pre-change safety |
 | [netbox-assurance](../netbox-assurance/SKILL.md) | Platform | Drift detection — intended vs actual, remediation |
+| [netbox-asset-lifecycle](../netbox-asset-lifecycle/SKILL.md) | Platform | Procurement lifecycle — BOMs, POs, shipments, receiving, spares |
+| [netbox-ndx](../netbox-ndx/SKILL.md) | Platform | Data Exchange — device-type catalog + enrichment (lifecycle, thermal, protocols) |
+| [netboxlabs-platform-mcp](../netboxlabs-platform-mcp/SKILL.md) | Platform | Platform MCP server — code mode & discrete mode for agents |
 | [netbox-automation-patterns](../netbox-automation-patterns/SKILL.md) | Cross-cutting | Webhooks, Ansible, Terraform, GitOps |
 | [netbox-migration](../netbox-migration/SKILL.md) | Cross-cutting | Migrating from spreadsheets, CMDBs, other tools |
 | [netbox-review-integration](../netbox-review-integration/SKILL.md) | Review | Audit integration code for correctness and performance |
@@ -99,6 +109,9 @@ Some tasks span multiple skills. Common combinations:
 | Model + populate data | `netbox-data-modeling` + `netbox-api-integration` |
 | Review a full integration | `netbox-review-integration` + `netbox-review-datamodel` |
 | Pre-change validation | `netbox-validation` + `netbox-branching` + `netbox-changes` |
+| Procure planned equipment | `netbox-data-modeling` + `netbox-asset-lifecycle` |
+| EOL exposure across inventory | `netbox-ndx` + `netbox-api-integration` |
+| Agent-driven NetBox automation | `netboxlabs-platform-mcp` + `netbox-api-integration` |
 
 ---
 

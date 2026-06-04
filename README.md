@@ -58,6 +58,9 @@ npx skills add netboxlabs/skills
 | [netbox-discovery](skills/netbox-discovery/) | Orb Agent — config, backends, policies, secrets |
 | [netbox-validation](skills/netbox-validation/) | Validation policies, compliance checks, findings, pre-change safety |
 | [netbox-assurance](skills/netbox-assurance/) | Drift detection — intended vs actual, remediation |
+| [netbox-asset-lifecycle](skills/netbox-asset-lifecycle/) | Procurement lifecycle — BOMs, POs, shipments, receiving, spares |
+| [netbox-ndx](skills/netbox-ndx/) | Data Exchange — device-type catalog + enrichment (lifecycle, thermal, protocols) |
+| [netboxlabs-platform-mcp](skills/netboxlabs-platform-mcp/) | Platform MCP server — code mode & discrete mode for agents |
 | [netbox-automation-patterns](skills/netbox-automation-patterns/) | Webhooks, Ansible, Terraform, GitOps |
 | [netbox-migration](skills/netbox-migration/) | Migrating from spreadsheets, CMDBs, other tools |
 | [netbox-review-integration](skills/netbox-review-integration/) | Review integration code for correctness and performance |
@@ -68,7 +71,7 @@ npx skills add netboxlabs/skills
 | Server | Access | Status | Link |
 |--------|--------|--------|------|
 | `netbox-mcp-server` | Read-only (OSS) | Available | [GitHub](https://github.com/netboxlabs/netbox-mcp-server) |
-| NetBox Labs Platform MCP Server | Full CRUD (Commercial) | Coming soon | — |
+| NetBox Labs Platform MCP Server | Full CRUD (Commercial) | Public Preview | [Skill](skills/netboxlabs-platform-mcp/) |
 
 Run `/setup-mcp` to configure MCP server access for your agent.
 

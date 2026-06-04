@@ -26,6 +26,9 @@ For non-Claude agents: load the hub skill first, then drill into specialists.
 | netbox-discovery | `skills/netbox-discovery/SKILL.md` | Network discovery with Orb Agent |
 | netbox-validation | `skills/netbox-validation/SKILL.md` | Validation policies, runs, findings, compliance |
 | netbox-assurance | `skills/netbox-assurance/SKILL.md` | Drift detection and remediation |
+| netbox-asset-lifecycle | `skills/netbox-asset-lifecycle/SKILL.md` | Procurement (BOMs, POs, shipments) and spares |
+| netbox-ndx | `skills/netbox-ndx/SKILL.md` | Consuming device-type catalog + enrichment data |
+| netboxlabs-platform-mcp | `skills/netboxlabs-platform-mcp/SKILL.md` | Driving the Platform MCP server (code/discrete mode) |
 | netbox-automation-patterns | `skills/netbox-automation-patterns/SKILL.md` | Webhooks, Ansible, Terraform, GitOps |
 | netbox-migration | `skills/netbox-migration/SKILL.md` | Data migration into NetBox |
 | netbox-review-integration | `skills/netbox-review-integration/SKILL.md` | Reviewing integration code quality |

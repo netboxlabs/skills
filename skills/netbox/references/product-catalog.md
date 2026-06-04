@@ -14,7 +14,10 @@ Reference for all platform products and their interfaces.
 | **Diode** | Data Ingestion | gRPC (Python/Go SDKs) | `netbox-diode` |
 | **Orb Agent** | Discovery | Config file (YAML) | `netbox-discovery` |
 | **NetBox Assurance** | Drift Detection | REST API (via Diode reconciler) | `netbox-assurance` |
+| **NetBox Asset Lifecycle** | Procurement / Asset Management | REST API (`/api/plugins/asset-lifecycle/`) + UI | `netbox-asset-lifecycle` |
+| **NetBox Data Exchange (NDX)** | Reference Data Catalog | Open catalog (YAML) + REST API (`/api/plugins/ndx/`) | `netbox-ndx` |
 | **netbox-mcp-server** | Agent Interface | MCP protocol (SSE/stdio) | [GitHub](https://github.com/netboxlabs/netbox-mcp-server) |
+| **NetBox Labs Platform MCP Server** | Agent Interface | MCP protocol (streamable HTTP) | `netboxlabs-platform-mcp` |
 | **NetBox Cloud** | Managed Deployment | Console UI, REST API | *(no skill yet)* |
 | **NetBox Copilot** | Interactive AI | Chat interface | (future skill) |
 | **Visual Explorer** | Visualization | Micro-frontend | (no skill needed — UI only) |

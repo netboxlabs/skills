@@ -25,10 +25,13 @@ Quick reference for version-dependent features across the platform.
 | NetBox Changes | 4.2+ | Pairs with Branching |
 | NetBox Custom Objects | 4.4+ | No-code data model extensibility |
 | NetBox Validation | 4.2+ | Policy-based compliance checks |
+| NetBox Asset Lifecycle | 4.5–4.6 | Public Preview; procurement + spares |
+| NetBox Data Exchange (NDX) | Cloud / Enterprise | In-product feature; type-definition catalog (YAML) is open and version-independent |
 | Diode | 4.2.3+ | gRPC ingestion service |
 | Orb Agent (Discovery) | 4.2+ | Via Diode |
 | NetBox Assurance | 4.2+ | Via Diode reconciler |
 | netbox-mcp-server | 4.5+ | v2 tokens required |
+| Platform MCP Server | 4.5+ | Hosted on NetBox Cloud; v2 tokens (`nbt_`) required |
 | NetBox Cloud | Always latest | Managed by NetBox Labs |
 
 ## SDK Versions

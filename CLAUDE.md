@@ -6,7 +6,7 @@
 skills/
   netbox/              # Hub skill — entry point, decision trees
     references/        # Shared references (product catalog, version matrix)
-  netbox-*/            # 15 specialized skills
+  netbox-*/            # 20 specialized skills
     SKILL.md           # Core instructions (< 500 lines)
     references/        # Detailed docs loaded on demand
     scripts/           # Optional executable code
