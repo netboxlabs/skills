@@ -33,8 +33,9 @@
 | PCI-DSS | Payment card security | `compliance-pci-dss` | 16 | Intent + Config + Graph |
 | MANRS | Routing security | `compliance-manrs` | 15 | Intent + Config + Graph |
 | ISO 27001:2022 | Info security mgmt | `compliance-iso-27001` | 22 | Intent + Config + Graph |
+| HIPAA Security Rule (2026) | US healthcare ePHI | `compliance-hipaa` | 20 | Intent + Config + Graph |
 
-**Total**: 157 rules across 8 frameworks.
+**Total**: 177 rules across 9 frameworks.
 
 ## Install / Uninstall
 
@@ -154,6 +155,14 @@ Delete rules you don't need, add new ones with different checks or parameters.
 **Controls**: A.8.20 (network security), A.8.21 (network services), A.8.22 (segregation), A.8.24 (cryptography), A.8.9 (config management), A.5.37 (documented procedures).
 
 **Prerequisites**: Customize `management_vrf_name` and `restricted_prefixes`.
+
+### HIPAA Security Rule 2026 (20 rules)
+
+**Controls**: Asset inventory & network map (§164.308(a)(1)), network segmentation / ePHI isolation (§164.312, proposed), encryption in transit (§164.312(e), §164.312(a)(2)(iv)), management/routing authentication (§164.312(d)), contingency & 72-hour restoration resilience (§164.308(a)(7)), pre-change validation (§164.306(d)). Based on the 2026 NPRM (90 FR 898) — **proposed rule, final CFR numbering may change**. Design-time validation, not a compliance attestation.
+
+**Not covered**: MFA, anti-malware, audit logging/SIEM, vulnerability scanning & pen-test cadence, patch SLAs, workforce access termination, risk-analysis/IR documentation, BAAs, training, physical security.
+
+**Prerequisites**: Set `zones[].prefixes` + ePHI `vrf` name, `restricted_prefixes`, `management_vrf_name`, and `assert_traffic_blocked` src/dst to your clinical environment.
 
 ## Coverage Transparency
 

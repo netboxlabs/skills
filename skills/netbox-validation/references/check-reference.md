@@ -1,6 +1,6 @@
-# Check Reference — All 93 Built-in Checks
+# Check Reference — All 95 Built-in Checks
 
-## Intent Checks (42)
+## Intent Checks (44)
 
 ### Addressing (8)
 
@@ -64,7 +64,7 @@
 | `asset_documentation_complete` | Device fields populated | `required_fields` |
 | `ntp_syslog_configured` | NTP+syslog in config context | `ntp_key`, `syslog_key`, `require_both` |
 
-### Security Intent (5)
+### Security Intent (7)
 
 | Check | Description | Parameters |
 |-------|-------------|------------|
@@ -73,6 +73,8 @@
 | `required_context_structure` | Config context matches schema | `schema` |
 | `no_plaintext_secrets_in_context` | No password patterns in context | `patterns` |
 | `restricted_prefix_usage` | Prefixes restricted by role | `restricted_prefixes` |
+| `secure_protocols_enforced` | No cleartext mgmt protocols (Telnet/HTTP/SNMPv1-2c/FTP) in config context | `insecure_keys`, `required_keys` |
+| `ephi_zone_segmentation` | Sensitive-zone prefixes isolated in a dedicated VRF | `zones` |
 
 ## Config Checks (35)
 
