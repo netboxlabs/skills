@@ -251,7 +251,7 @@ Intent checks always run. Config and graph checks require their engine to be ena
 Pre-built policy packs provide one-click installation:
 
 - **14 starter packs** — addressing, cabling, data quality, naming, redundancy, security, leaf/spine baselines, config analysis, pre-change, BGP attributes, power/network/full resilience
-- **8 compliance frameworks** — CLOS Fabric, TIA-942, NIS2/DORA, NIST 800-53, NERC CIP, PCI-DSS, MANRS, ISO 27001
+- **9 compliance frameworks** — CLOS Fabric, TIA-942, NIS2/DORA, NIST 800-53, NERC CIP, PCI-DSS, MANRS, ISO 27001, HIPAA Security Rule (2026)
 
 Installed packs create regular policies and rules. After installation, customize scope, parameters, triggers, and schedule. See [references/policy-packs.md](references/policy-packs.md).
 
