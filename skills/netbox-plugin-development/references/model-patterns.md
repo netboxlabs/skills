@@ -15,7 +15,7 @@ django.db.Model
 - `NetBoxModel` — generic plugin object, you define all fields
 - `PrimaryModel` — object with description + comments (e.g., a circuit, a service)
 - `OrganizationalModel` — categorization object with unique name/slug (e.g., a role, a type)
-- `NestedGroupModel` — hierarchical grouping (e.g., regions, location types)
+- `NestedGroupModel` — hierarchical grouping (e.g., regions, location types); deprecated in 4.7 — use `NestedLtreeGroupModel` if `min_version` >= `'4.7.1'`
 
 ## NetBoxFeatureSet Mixins
 
@@ -105,6 +105,7 @@ assigned_object = GenericForeignKey('assigned_object_type', 'assigned_object_id'
 - When referencing core models in migrations, use `('dcim', 'Device')` tuple
 - Test migrations both forward and backward: `python manage.py migrate netbox_myplugin zero`
 - Never import model classes directly in migration files — use `apps.get_model()`
+- `NestedLtreeGroupModel`: add `InstallLtreeTriggers('netbox_myplugin_<model>', name_column='name')` (from `utilities.ltree`) to the creating migration — makemigrations omits it, and without it `get_ancestors()`/`get_descendants()` silently return nothing
 
 ## get_absolute_url() Pattern
 
