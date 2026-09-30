@@ -21,7 +21,7 @@ license: Apache-2.0
 | Example plugins | `https://github.com/netbox-community` | Community plugin patterns |
 
 Build plugins that extend NetBox with custom models, views, APIs, and UI elements.
-Target: **NetBox 4.5–4.6** / **Python 3.12–3.14**. Note the Django split: **NetBox 4.5 runs on Django 5.2, NetBox 4.6 on Django 6.0** — code, migrations, and third-party deps must be Django 6.0-compatible when targeting 4.6+.
+Target: **NetBox 4.5–4.7** / **Python 3.12–3.14**. Note the Django split: **NetBox 4.5 runs on Django 5.2, NetBox 4.6 on Django 6.0, NetBox 4.7 on Django 6.1** — code, migrations, and third-party deps must be Django 6.0-compatible when targeting 4.6+, and 6.1-compatible when targeting 4.7+.
 
 > For REST API client patterns (pagination, filtering, tokens), see
 > [netbox-api-integration](../netbox-api-integration/SKILL.md).
@@ -111,7 +111,7 @@ class MyPluginConfig(PluginConfig):
     author_email = 'you@example.com'
     base_url = 'myplugin'               # URL prefix under /plugins/
     min_version = '4.5.0'
-    max_version = '4.6.99'              # span 4.5–4.6; use .99 to allow patch releases
+    max_version = '4.7.99'              # span 4.5–4.7; use .99 to allow patch releases
     default_settings = {'feature_x': True}
     required_settings = []
 
@@ -440,7 +440,7 @@ Use `pyproject.toml` (modern) or `setup.py`:
 [project]
 name = "netbox-myplugin"
 version = "1.0.0"
-dependencies = ["netbox>=4.5.0,<4.7"]   # span 4.5–4.6
+dependencies = []   # omit "netbox": pip would install a second copy from PyPI
 
 [project.entry-points."netbox.plugins"]
 netbox_myplugin = "netbox_myplugin:config"
@@ -470,6 +470,11 @@ publishing to PyPI, and version compatibility matrix.
 ---
 
 ## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+- **PostgreSQL 15+** required — NetBox's system check fails on 14, including under `manage.py test`
+- **Removed:** `DEFAULT_ACTION_PERMISSIONS`, legacy view actions, `registry['models']` (use `ObjectType.objects.public()`), `OptionalLimitOffsetPagination` (use `NetBoxPagination`), and NetBox's `querystring` tag (use Django's, without `request`: `{% querystring page=1 %}`)
+- **Core trees moved from MPTT to ltree** (Region, Location, Platform, …): `level` can't be filtered/ordered on; `get_root()`/`get_family()`/`is_leaf_node()` are gone. `NestedGroupModel` is deprecated — see [model-patterns](references/model-patterns.md)
 
 ### NetBox 4.6 (2026)
 - **Django 6.0** (was 5.2 in 4.5) — ensure code, migrations, and dependencies are Django 6.0-compatible; set `min_version='4.6.0'` for any plugin using 4.6-only APIs below

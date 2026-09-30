@@ -61,7 +61,7 @@ This is how NetBox discovers and loads your plugin.
 In `PluginConfig`:
 ```python
 min_version = '4.5.0'     # oldest NetBox version supported
-max_version = '4.6.99'    # span 4.5–4.6; use .99 to allow all patch releases
+max_version = '4.7.99'    # span 4.5–4.7; use .99 to allow all patch releases
 ```
 
 **Versioning guidelines:**
@@ -139,7 +139,7 @@ Test against multiple NetBox versions in CI:
 # .github/workflows/test.yml
 strategy:
   matrix:
-    netbox-version: ['4.5.0', '4.5.8', '4.6.2']
+    netbox-version: ['4.5.0', '4.5.8', '4.6.2', '4.7.2']
     python-version: ['3.12', '3.13', '3.14']
 ```
 
