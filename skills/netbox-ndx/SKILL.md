@@ -156,13 +156,16 @@ NetBox 4.7 added a single optional `end_of_life` date to `DeviceType` and `Modul
 | Provenance | None — user-maintained | `provenance_entries[]` with source URL + confidence |
 | Reach | Core filters, tables, exports, any plugin, any NetBox version 4.7+ | `/api/plugins/ndx/` on Cloud/Enterprise, values on paid plans |
 
-The NDX docs describe enrichment as "imported and linked to the device type" and do not state that import or sync writes core `end_of_life` or `cooling_method` — **do not assume it is populated.** On 4.7+ an agent can set it from NDX (pick `last_support_date` to match the field's meaning; fall back to `eos_date`; expand `YYYY-MM` to a full date) and keep the NDX record as the sourced detail:
+**NDX populates core `end_of_life` for you (NDX plugin 0.7.0+, 2026-09-19, on NetBox 4.7+).** On import and re-import, NDX writes `DeviceType`/`ModuleType.end_of_life` from the enrichment's **`last_support_date`** (the semantic match for "no longer supported by the manufacturer"), never from `eos_date` (end of sale) or `eol_announced`. Rules an agent must know:
 
-```bash
-PATCH /api/dcim/device-types/{id}/   {"end_of_life": "2030-04-30"}
-```
+- Controlled by the plugin setting `populate_core_end_of_life` (default **on**); off leaves lifecycle data in the enrichment record only.
+- Only a strict `YYYY-MM-DD` value is written. A partial `YYYY-MM` `last_support_date` is **skipped** (logged, field left unchanged) — a guessed date is treated as worse than none.
+- Local edits win: the core field is written only when it is empty or still equals the value NDX last wrote. A date a user changed is left alone on re-import.
+- `cooling_method` is **not** populated. NDX thermal `cooling_type` (`air`/`liquid`/`mixed`/`passive`) stays in the enrichment record.
 
-Re-import "updates catalog-sourced fields while preserving your local changes to other fields" (NDX docs) — so a hand-set `end_of_life` is treated like any other local edit. NDX thermal `cooling_type` uses `air`/`liquid`/`mixed`/`passive`; map `mixed` → `hybrid` if you copy it into core `cooling_method`, and leave `passive` unset (no core equivalent).
+So on 4.7+ with a current NDX plugin, treat core `end_of_life` as NDX-maintained and do not overwrite it by hand. Write it yourself only when the setting is off, the type was imported before plugin 0.7.0 and not re-synced, or the NDX date is partial and the user accepts an expanded date:
+
+A hand-set `end_of_life` that differs from the last NDX-written value is preserved on re-import. If you copy NDX `cooling_type` into core `cooling_method`, map `mixed` → `hybrid` and leave `passive` unset (no core equivalent) — NDX does not do this for you.
 
 ## Common Workflows
 
@@ -199,7 +202,7 @@ So a `has_lifecycle: true` with empty lifecycle fields is a tier-gating signal, 
 
 ### NetBox 4.7 (2026-09-02)
 
-- Core `end_of_life` (date) and `cooling_method` on `DeviceType`/`ModuleType`; `cooling_capability`/`cooling_capacity` on Rack/RackType; full cooling models (sources, feeds, intakes, outflows). NDX enrichment stays the sourced, multi-date lifecycle and thermal record; whether import populates the new core fields is not documented — verify on your instance, or write them from NDX as shown above.
+- Core `end_of_life` (date) and `cooling_method` on `DeviceType`/`ModuleType`; `cooling_capability`/`cooling_capacity` on Rack/RackType; full cooling models (sources, feeds, intakes, outflows). NDX enrichment stays the sourced, multi-date lifecycle and thermal record; NDX plugin 0.7.0+ writes core `end_of_life` from `last_support_date` on import (setting `populate_core_end_of_life`, default on; strict dates only; local edits preserved) and does not write `cooling_method`. NDX plugin 0.7.1 declares NetBox 4.5–4.7 compatibility.
 - `GET /api/dcim/devices/` always includes `config_context` on 4.7 (`?exclude=config_context` is ignored) — keep `?fields=id,name,device_type` on the exposure-report pull.
 - Selection custom fields read as `{"value", "label"}` — matters only if you store NDX-derived values in custom fields on 4.5–4.6 instances and compare them.
 

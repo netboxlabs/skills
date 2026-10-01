@@ -26,7 +26,7 @@ Quick reference for version-dependent features across the platform.
 | New models: CoolingSource/Feed/Intake/Outflow, ModuleBayType | 4.7+ | See data-modeling skill |
 | Channelized subinterfaces (`channels`, `channel_id`) | 4.7+ | Breakout interfaces modeled natively |
 | Service `port_mappings` (replaces `protocol` + `ports`) | 4.7+ | Legacy fields deprecated in REST/GraphQL, removed v5.0 |
-| DeviceType / ModuleType `end_of_life` | 4.7+ | Core lifecycle date; NDX enrichment carries the sourced detail |
+| DeviceType / ModuleType `end_of_life` | 4.7+ | Core lifecycle date; NDX plugin 0.7.0+ populates it from `last_support_date`, enrichment carries the sourced detail |
 | Rack `form_factor` / `width` / `outer_*` | Deprecated 4.7 | Removed v5.0 — inferred from a mandatory rack type |
 | Core custom scripts | Deprecated 4.7 | Supported through 4.8, removed v5.0 in favor of a dedicated plugin; REST execution needs a write-enabled token |
 | `JINJA_FILTERS` (was `JINJA2_FILTERS`) | 4.7+ | Old name works until v5.0; plugins can register filters |
@@ -48,10 +48,10 @@ Quick reference for version-dependent features across the platform.
 | NetBox Custom Objects | v0.7.0 · NetBox 4.5.2–4.7 (0.6.1+ for 4.7) | No-code extensibility; v0.6 added branching + read-only GraphQL, v0.7 the related "Custom Objects" tab and YAML schema export |
 | NetBox Validation | v1.14.1 · NetBox 4.4–4.7 (4.7 from 1.14.0) | Policy-based compliance checks; run lifecycle hardened in 1.12 |
 | NetBox Asset Lifecycle | v0.3.1 · NetBox 4.5.4–4.7 | v0.3 renamed `bom-objects/` → `assets/` and reinitialized migrations (no upgrade from 0.2.x) |
-| NetBox Data Exchange (NDX) | Cloud / Enterprise | In-product feature; type-definition catalog (YAML) is open and version-independent |
+| NetBox Data Exchange (NDX) | Plugin v0.7.1 · NetBox 4.5–4.7 (Cloud / Enterprise) | In-product feature; 0.7.0+ writes core `end_of_life` from NDX `last_support_date` on 4.7+; type-definition catalog (YAML) is open and version-independent |
 | Diode | NetBox 4.2.3+ | gRPC ingestion service |
 | Orb Agent (Discovery) | Agent v2.15.0 · NetBox 4.2+ | Via Diode; v2.15 ships SNMP and gNMI telemetry backends alongside discovery |
-| NetBox Assurance | Plugin v1.5.x · NetBox 4.4.10+ | Licensed add-on for NetBox Cloud and Enterprise; fed by Diode/Discovery — confirm the current ceiling in the product docs |
+| NetBox Assurance | Plugin v1.6.0 · NetBox 4.4.10–4.7 | Licensed add-on for NetBox Cloud and Enterprise; fed by Diode/Discovery |
 | netbox-mcp-server | v1.2.1 · NetBox 4.5+ | v2 tokens required; optional bearer auth on the HTTP transport |
 | Platform MCP Server | NetBox 4.5+ | Hosted on NetBox Cloud; v2 tokens (`nbt_`) required |
 | NetBox Cloud | Always latest | Managed by NetBox Labs |

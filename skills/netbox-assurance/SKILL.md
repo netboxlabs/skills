@@ -234,7 +234,7 @@ Assign these through NetBox's standard user/group permission system.
 
 ## Prerequisites
 
-- **NetBox Cloud or NetBox Enterprise** with Assurance enabled. The docs state the requirement as **NetBox Enterprise 1.10+ with an Assurance entitlement** (the license file determines whether Assurance services are installed) or a NetBox Cloud add-on to a Starter, Professional or Premium plan. The Assurance plugin has no public release feed; the v1.5.x line documented here was validated on NetBox 4.4.10 and later 4.x releases — the NetBox version you get is the one bundled with your Cloud/Enterprise platform release, so check the Assurance docs for the current pairing rather than assuming a ceiling.
+- **NetBox Cloud or NetBox Enterprise** with Assurance enabled. The docs state the requirement as **NetBox Enterprise 1.10+ with an Assurance entitlement** (the license file determines whether Assurance services are installed) or a NetBox Cloud add-on to a Starter, Professional or Premium plan. The Assurance plugin line is **v1.6.x** (v1.6.0, 2026-09-03), which declares **NetBox 4.4.10–4.7.x**; the NetBox version you get is the one bundled with your Cloud/Enterprise platform release.
 - At least one configured data source
 - Network connectivity between data sources and the Assurance service
 
@@ -279,7 +279,7 @@ Assign these through NetBox's standard user/group permission system.
 
 ### NetBox 4.7 (2026-09-02)
 
-- Data sources built on diode-sdk-python 1.14.x / diode-sdk-go 1.12.0 can emit the 4.7 models (cooling, `ModuleBayType`) and fields (`Interface.channels`/`channel_id`, `Service.port_mappings`, `DeviceType.end_of_life`, `cooling_method`), so those become comparable once the platform bundles NetBox 4.7 — see [references/data-sources.md](references/data-sources.md).
+- Data sources built on diode-sdk-python 1.14.x / diode-sdk-go 1.12.0 can emit the 4.7 models (cooling, `ModuleBayType`) and fields (`Interface.channels`/`channel_id`, `Service.port_mappings`, `DeviceType.end_of_life`, `cooling_method`), so those become comparable once your platform release bundles NetBox 4.7 (plugin v1.6.0 declares 4.7.x support) — see [references/data-sources.md](references/data-sources.md).
 - REST responses you read while triaging (selection custom fields as `{"value", "label"}` objects, `port_mappings` on services, per-object bulk errors) changed shape — see [references/deviation-lifecycle.md](references/deviation-lifecycle.md#netbox-47-api-changes-that-affect-remediation).
 
 ### NetBox 4.6
