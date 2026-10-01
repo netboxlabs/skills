@@ -1,6 +1,6 @@
 # Custom Field Types
 
-All custom field types available in NetBox 4.6 (the same 13 types ship on 4.5) with validation options, API format, and use cases.
+All custom field types available in NetBox 4.7 (the same 13 types ship on 4.5 and 4.6) with validation options, API format, and use cases.
 
 ## Field Types
 
@@ -13,10 +13,10 @@ All custom field types available in NetBox 4.6 (the same 13 types ship on 4.5) w
 | **boolean** | `true`/`false` | — | Feature flags. Consider a tag if it's cross-object |
 | **date** | `"2026-04-18"` | min/max date | Warranty expiry, install date, review date |
 | **datetime** | `"2026-04-18T12:00:00Z"` | — | Timestamps for events |
-| **url** | `"https://..."` | URL format | Monitoring links, documentation URLs |
+| **url** | `"https://..."` | URL format; *(4.7)* scheme must be in `ALLOWED_URL_SCHEMES`, scheme-less values stored as `https://…` | Monitoring links, documentation URLs |
 | **json** | `{...}` or `[...]` | JSON Schema (via validation) | Structured data that doesn't fit other types |
-| **selection** | `"choice-value"` | CustomFieldChoiceSet | Single-select from defined options: environment, tier |
-| **multiselect** | `["a", "b"]` | CustomFieldChoiceSet | Multi-select: supported protocols, compliance frameworks |
+| **selection** | write `"choice-value"`; read *(4.7)* `{"value": "choice-value", "label": "Label"}`, *(4.5–4.6)* `"choice-value"` | CustomFieldChoiceSet | Single-select from defined options: environment, tier |
+| **multiselect** | write `["a", "b"]`; read *(4.7)* `[{"value": "a", "label": "A"}, …]`, *(4.5–4.6)* `["a", "b"]` | CustomFieldChoiceSet | Multi-select: supported protocols, compliance frameworks |
 | **object** | `{"id": 42}` or `42` | Specific object type | FK-like reference to another NetBox object |
 | **multiobject** | `[42, 43]` | Specific object type | Multiple references: backup devices, related circuits |
 
@@ -36,6 +36,22 @@ Custom field data is nested under `custom_fields` in the object payload:
     "monitoring_url": "https://grafana.example.com/d/router-01"
   }
 }
+```
+
+### Reading Selection Values (4.7+)
+
+Selection and multi-selection values are returned as `{value, label}` objects in REST and GraphQL, matching NetBox's built-in choice fields. Write the raw value, read `.value`:
+
+```json
+"custom_fields": {
+  "environment": {"value": "production", "label": "Production"},
+  "frameworks": [{"value": "pci", "label": "PCI DSS"}, {"value": "hipaa", "label": "HIPAA"}]
+}
+```
+
+```python
+env = device["custom_fields"]["environment"]
+env = env["value"] if isinstance(env, dict) else env   # works on 4.5–4.7
 ```
 
 ### Filtering by Custom Fields
@@ -78,6 +94,17 @@ Choice sets can be reused across multiple custom fields.
 | `default` | varies | Pre-populated value for new objects |
 | `search_weight` | integer | Weight in global search (0 = excluded) |
 | `validation_schema` *(4.6)* | JSON Schema object | Validate **json**-type field values against a JSON Schema (replaces ad-hoc validation) |
+| `nulls_first` *(4.7)* | boolean (default true) | Sort objects with no value before (true) or after (false) valued ones when ordering by the field |
+| `status` *(4.7, read-only)* | active / provisioning / deleting | Lifecycle state — see below |
+
+## Field Status and Background Provisioning (4.7+)
+
+Creating a field **with a default value**, and deleting a field, rewrite stored data on every object of the assigned types. When those types hold more than `BULK_UPDATE_CHUNK_SIZE` objects in total, the work runs as a background job (needs `rqworker`):
+
+- `status: provisioning` — default being written; the field is not live yet (omitted from `custom_fields` on objects until `active`)
+- `status: deleting` — data being purged; the name stays reserved until the job finishes
+- A field stuck mid-operation stays in that status; delete and recreate it, or requeue the job from Background Tasks
+- Bulk imports: create custom fields **before** loading data and, on large tables, poll `GET /api/extras/custom-fields/<id>/` until `status` is `active` before writing values
 
 ## Guidelines
 

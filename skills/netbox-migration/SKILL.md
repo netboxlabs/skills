@@ -123,11 +123,11 @@ For NetBox's data model and relationships, see [netbox-data-modeling](../netbox-
 2. Regions, site groups
 3. Sites
 4. Locations (within sites)
-5. Racks (within locations)
-6. Device types + component templates (need manufacturer)
+5. Racks (within locations) — *(4.7)* then cooling sources/feeds
+6. Device types + component templates (need manufacturer) — *(4.7)* module bay types first if you use them
 7. Devices (need type, role, site) — components auto-created from templates
-8. Interfaces (custom ones beyond templates)
-9. VRFs, VLANs, prefixes, IP addresses → assign to interfaces
+8. Interfaces (custom ones beyond templates) — *(4.7)* channel subinterfaces after their parent
+9. VRFs, VLANs, prefixes, IP addresses → assign to interfaces; services
 10. Cables, circuits, providers
 11. Virtual machines, clusters, config contexts, custom field values
 
@@ -141,8 +141,8 @@ For NetBox's data model and relationships, see [netbox-data-modeling](../netbox-
 - **Import in phases** — Sites/racks first, verify, then devices, verify, then IPAM
 - **Reference objects by name/slug in CSV**, not database IDs
 - **DeviceType/ModuleType use YAML format**, not CSV (they include component templates)
-- **Bulk create** with pynetbox: `nb.dcim.devices.create([{...}, {...}])` — batch in chunks of ~100 (a recommended size for throughput/memory, **not** a NetBox-enforced limit)
-- **Exclude config_context** from API queries during bulk operations (massive performance impact)
+- **Bulk create** with pynetbox: `nb.dcim.devices.create([{...}, {...}])` — batch in chunks of ~100 (a recommended size for throughput/memory, **not** a NetBox-enforced limit). Bulk writes are all-or-none. *(4.7)* A failed bulk write returns one error per offending object with its `index` in your submitted list — map it back to the source row and resubmit only those; very large batches can run as a background job with `?background=true`. See [references/import-patterns.md](references/import-patterns.md#bulk-write-errors-and-background-jobs-netbox-47).
+- **Trim `config_context`** on device/VM reads: on **4.5–4.6** send `?exclude=config_context` (massive performance impact); on **4.7+** config context is pre-rendered and the parameter is silently ignored — use `?fields=` / `?brief=True` instead
 - **Reading back large sets for validation:** on NetBox **4.6+** prefer cursor pagination (`?start=<id>&limit=N`) over deep `?offset=` scans — offset slows linearly at high offsets. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 For API patterns, see [netbox-api-integration](../netbox-api-integration/SKILL.md).
@@ -155,6 +155,7 @@ For API patterns, see [netbox-api-integration](../netbox-api-integration/SKILL.m
 - Object counts match source: devices, IPs, prefixes, sites, VLANs
 - No import errors or skipped records
 - Required fields populated on all objects
+- Custom field values landed — *(4.7)* selection/multi-selection values read back as `{"value", "label"}` objects; compare `["value"]`, write the raw value
 
 #### Layer 2: Relational (connections correct)
 - Every device has correct site, device type, manufacturer, and role
@@ -249,6 +250,22 @@ A migration is **done** when:
 8. **Large CSV imports are slow** — For > 1K objects, switch to API or Diode.
 9. **Don't migrate everything at once** — Phase it. Sites → devices → IPAM → connections.
 10. **"Feeling overwhelmed"** — Normal. Focus on what NetBox has models for. Ignore data that doesn't map.
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- Failed bulk create/update returns `{"detail", "errors": [{"index": N, "errors": {...}}]}` (still all-or-none); `?background=true` on bulk writes returns 202 + a job to poll. See [references/import-patterns.md](references/import-patterns.md#bulk-write-errors-and-background-jobs-netbox-47).
+- `?exclude=config_context` is silently ignored (config context is cached and always present) — project with `?fields=` instead.
+- Selection custom fields read as `{"value", "label"}`; raw value still accepted on write.
+- Services: `port_mappings` (`["tcp/443"]`) replaces `protocol` + `ports` (legacy pair still writable, removed in 5.0).
+- New importable models: `ModuleBayType`, cooling sources/feeds/intakes/outflows, channel subinterfaces; `end_of_life` and `cooling_method` on DeviceType/ModuleType. See [references/dependency-order.md](references/dependency-order.md) and [references/source-mapping.md](references/source-mapping.md).
+- Hierarchies moved to `ltree`: REST `_depth` is unchanged, but in-NetBox scripts can no longer filter or order on `level`.
+- Core custom scripts are deprecated (removed in 5.0) — prefer pynetbox/Diode for new import tooling.
+
+### NetBox 4.6 (2026-06-04)
+
+- Cursor pagination (`?start=`), write-only `add_tags`/`remove_tags`, `RackGroup`, `CableBundle`, `VirtualMachineType`.
 
 ## References
 

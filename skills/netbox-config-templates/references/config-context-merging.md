@@ -141,17 +141,28 @@ Use local context sparingly — for true per-device exceptions only.
 
 ### Bulk Operations
 
-When querying many devices, config context computation per-device is expensive. NetBox can annotate querysets with `jsonb_agg` for bulk computation via PostgreSQL, but the default API list endpoint computes individually.
+> **NetBox 4.7+**: the merged result is pre-rendered and cached on the device/VM (see below), so list endpoints no longer compute it per object and `config_context` is **always** included. `?exclude=config_context` is **silently ignored** — sending it is harmless but does nothing.
 
-**Always use `?exclude=config_context`** on device/VM list endpoints when you don't need the merged config context:
+**NetBox 4.5/4.6**: config context computation per device is expensive on list endpoints. Always use `?exclude=config_context` on device/VM list endpoints when you don't need the merged config context:
 
 ```python
-# Slow — computes config context for every device
+# Slow on 4.5/4.6 — computes config context for every device
 devices = requests.get(f"{NETBOX}/api/dcim/devices/", headers=headers)
 
-# Fast — skips config context computation  
+# Fast on 4.5/4.6 — skips config context computation (ignored on 4.7, still safe to send)
 devices = requests.get(f"{NETBOX}/api/dcim/devices/?exclude=config_context", headers=headers)
 ```
+
+### Pre-Rendered Cache (NetBox 4.7+)
+
+| Event | Effect |
+|-------|--------|
+| Config context created / edited / deleted; device or VM scope attribute changed (site, role, tenant, tags, cluster, …) | Affected caches marked invalid; non-blocking background job re-renders them |
+| Read during the invalidation → re-render window | Falls back to on-demand rendering (correct, slightly slower) |
+| Upgrade to 4.7 | Upgrade script runs `manage.py rebuild_config_context_cache` — one `UPDATE` per device/VM; skips already-populated objects, so safe to interrupt, re-run, or defer until after NetBox is back up |
+| Bulk write that bypasses signals (`queryset.update()`, direct SQL) | Cache is **not** invalidated — run `manage.py rebuild_config_context_cache --force` |
+
+Merge order, weights, and `deepmerge()` semantics are unchanged; only *when* the merge runs differs.
 
 ### Config Context Profiles (Schema Validation)
 

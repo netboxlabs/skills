@@ -24,11 +24,15 @@ provider "netbox" {
 
 **Always pin the provider version.** NetBox makes breaking API changes in minor releases, and the provider version must match. Check the provider's compatibility matrix:
 
-| Provider Version | NetBox Version |
+| Provider Version | NetBox Version (per provider README, checked 2026-09-30) |
 |-----------------|---------------|
-| v5.0.0+ | 4.3–4.4.x |
+| v5.6.1 – v5.8.0 | 4.3.0 – 4.6.5 |
+| v5.0.0 – v5.6.0 | 4.3.0 – 4.4.10 |
+| v6.0.0-rc.x | 4.6.8 – 4.6.10 (full rewrite, see below) |
 
-> The community Terraform provider (e-breuninger/terraform-provider-netbox) trails NetBox releases. For **NetBox 4.5/4.6** do not assume the row above still applies — check the provider's current release notes / compatibility matrix and pin to the version that lists support for your exact NetBox minor. NetBox can introduce breaking API changes in minor releases, so a mismatched provider fails in subtle ways.
+> **No provider release declares NetBox 4.7 support yet.** The provider probes the NetBox version at init and emits a non-blocking warning when unsupported. 4.7 changes most likely to bite the v5.x provider: selection custom fields now read back as `{value,label}` objects (perpetual diff or type error on `custom_fields`), `config_context` always present on devices/VMs, and `netbox_service` `protocol`/`ports` returning `null` for multi-protocol services. Test against 4.7 in staging before pinning, and re-check the README matrix.
+>
+> **v6.0.0** (release candidates since 2026-09-26) is a generated rewrite on the Terraform Plugin Framework with breaking changes: `netbox_interface` → `netbox_virtual_machine_interface`, `netbox_device_primary_ip` merged into `netbox_primary_ip`, tags referenced by slug, data-source `filter` blocks → `filters`, custom-field lookups → `custom_field_filters` / `cf_<name>`. Stay on `~> 5.0` for existing state until you plan the migration.
 
 ---
 
@@ -105,7 +109,7 @@ resource "netbox_rack" "rack1" {
 |----------|-----------|-------------|
 | DCIM | `netbox_device`, `netbox_site`, `netbox_rack`, `netbox_device_interface`, `netbox_platform`, `netbox_manufacturer`, `netbox_cable` | Yes |
 | IPAM | `netbox_ip_address`, `netbox_prefix`, `netbox_vlan`, `netbox_vrf`, `netbox_available_ip_address`, `netbox_available_prefix` | Yes |
-| Virtualization | `netbox_cluster`, `netbox_virtual_machine`, `netbox_vm_interface` | Yes |
+| Virtualization | `netbox_cluster`, `netbox_virtual_machine`, `netbox_interface` (VM interface; `netbox_virtual_machine_interface` in v6) | Yes |
 | Tenancy | `netbox_tenant`, `netbox_contact`, `netbox_contact_assignment` | Yes |
 | Extras | `netbox_tag`, `netbox_custom_field`, `netbox_config_context`, `netbox_webhook`, `netbox_event_rule` | Partial |
 
@@ -152,8 +156,10 @@ This keeps NetBox and actual infrastructure in sync through a single Terraform s
 
 1. **Version coupling**: The provider's API calls must match the NetBox version exactly. Always test provider upgrades against your NetBox version in a staging environment.
 
-2. **`netbox_interface` renamed**: The old `netbox_interface` resource was renamed to `netbox_device_interface`. Existing state requires migration.
+2. **Interface resource names**: in v5.x `netbox_interface` manages **VM** interfaces and `netbox_device_interface` manages device interfaces. v6.0 renames `netbox_interface` to `netbox_virtual_machine_interface`; existing state must be re-imported.
 
 3. **`available_*` failures**: If no IPs/prefixes are available in the parent, the apply fails. Ensure sufficient capacity before running.
 
-4. **Incomplete coverage**: The provider has strongest support for IPAM and virtualization. For models without Terraform resources, use Ansible or direct API calls.
+4. **Incomplete coverage**: The v5.x provider has strongest support for IPAM and virtualization. For models without Terraform resources, use Ansible or direct API calls. (v6.0 generates resources from the API spec and aims for full coverage.)
+
+5. **Services on NetBox 4.7**: `netbox_service` still writes `protocol` + `ports`; 4.7 accepts them (translated to `port_mappings`) and removes them in 5.0. Services that expose one port on several protocols cannot be expressed by the v5.x resource — manage them via API until the provider adds `port_mappings`.

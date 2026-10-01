@@ -1,14 +1,15 @@
-# Asset Lifecycle — Status Transitions Reference
+# Asset Lifecycle — Status Transitions Reference (plugin v0.3.x)
 
-Load this when a status change returns **400**.
+Load this when a status change or create returns **400**.
 
 ## How the transition system works
 
-`BOM`, `PurchaseOrder`, and `Shipment` each carry a `status`. A status change is validated against **StatusTransitionRule** records for that object type. The change is allowed when either:
-- a rule exists with `from_status = current` and `to_status = new`, OR
-- a rule exists with `from_status = new` and `to_status = current` **and** `allow_reverse = true`.
+`BOM`, `PurchaseOrder`, and `Shipment` each carry a `status`. Changes are validated against **StatusTransitionRule** records for that object type:
 
-If no matching rule exists, the API returns **400** (`Cannot transition from X to Y`). Rules are ordinary records — list, create, edit, or delete them via `status-transition-rules/`. `SpareItem.status` is **not** rule-governed (set it freely).
+- **On create**, the status must match an *initial-status rule* — a rule with a **blank `from_status`** and `to_status` = the requested status. Otherwise: `400 {"status": ["<status> is not a valid initial status."]}`.
+- **On update**, a change from `current` to `new` is allowed when either a rule has `from_status = current, to_status = new`, or a rule has `from_status = new, to_status = current` **and** `allow_reverse = true`. Otherwise: `400 {"status": ["Cannot transition from <current> to <new>"]}`.
+
+Rules are ordinary records — list, create, edit, delete via `status-transition-rules/`. `SpareItem.status` is **not** rule-governed.
 
 Discover valid status strings for an object type:
 
@@ -16,11 +17,14 @@ Discover valid status strings for an object type:
 GET /api/plugins/asset-lifecycle/status-transition-rules/status-choices/?object_type_id=<contenttype_id>
 ```
 
-## Default rules (shipped with the feature)
+(Find the content type id with `GET /api/core/object-types/?app_label=netbox_asset_lifecycle&model=shipment`.)
 
-Format below: `from → to (reversible?)`.
+## Default rules (installed on first migrate)
+
+Format: `from → to (reversible?)`. `(initial)` = blank `from_status`.
 
 ### BOM and PurchaseOrder (identical sets)
+- `(initial) → draft`
 - `draft → approved` (reversible)
 - `approved → ordered` (reversible)
 - `approved → fulfilled` (reversible)
@@ -28,9 +32,11 @@ Format below: `from → to (reversible?)`.
 - `ordered → fulfilled` (reversible)
 - `ordered → cancelled` (one-way)
 
-Reachable by default: `draft ↔ approved ↔ ordered ↔ fulfilled` (and `approved ↔ fulfilled`). Cancellation is only from `approved` or `ordered` and is terminal. There is **no** default `draft → ordered`, `draft → fulfilled`, or `draft → cancelled`.
+Reachable by default: `draft ↔ approved ↔ ordered ↔ fulfilled` (and `approved ↔ fulfilled`). Cancellation is only from `approved` or `ordered` and is terminal. There is **no** default `draft → ordered`, `draft → fulfilled`, or `draft → cancelled`, and BOMs/POs can only be **created** as `draft`.
 
 ### Shipment
+- `(initial) → prepared`
+- `(initial) → shipped` *(0.3)*
 - `prepared → shipped` (reversible)
 - `prepared → cancelled` (one-way)
 - `shipped → received` (reversible)
@@ -39,22 +45,36 @@ Reachable by default: `draft ↔ approved ↔ ordered ↔ fulfilled` (and `appro
 - `received → returned` (reversible)
 - `lost → received` (reversible)
 
-A shipment can only be **cancelled** while `prepared` or `shipped`. `received` can revert to `shipped` or advance to `returned`; a `lost` shipment can later become `received`.
+A shipment can be **created** as `prepared` or `shipped` (not `received`). It can only be cancelled while `prepared` or `shipped`. `received` can revert to `shipped` or advance to `returned`; a `lost` shipment can later become `received`.
 
-## Enabling an otherwise-illegal jump
-
-Add a rule, then make the change:
+## Customising the workflow
 
 ```bash
-POST /api/plugins/asset-lifecycle/status-transition-rules/
+# Permit a direct draft → ordered jump for POs (one-way)
+POST status-transition-rules/
 {"object_type": {"app_label":"netbox_asset_lifecycle","model":"purchaseorder"},
  "from_status": "draft", "to_status": "ordered", "allow_reverse": false}
 
-PATCH /api/plugins/asset-lifecycle/purchase-orders/<id>/  {"status": "ordered"}
+# Permit shipments to be created directly as received (initial-status rule)
+POST status-transition-rules/
+{"object_type": {"app_label":"netbox_asset_lifecycle","model":"shipment"},
+ "from_status": "", "to_status": "received"}
+
+# Lock approved BOMs (no going back to draft): clear allow_reverse on draft → approved
+PATCH status-transition-rules/<id>/  {"allow_reverse": false}
+
+# Disallow recovering a lost shipment: delete the lost → received rule
+DELETE status-transition-rules/<id>/
 ```
+
+Rules are per object type, so BOM, PO, and shipment lifecycles are tuned independently. Because they are ordinary records they can be exported/imported to keep several NetBox environments consistent.
 
 ## Model-specific constraints (also cause 400s)
 
-- **PO needs an order_id when non-draft.** Setting a PurchaseOrder to any status other than `draft` without an `order_id` is rejected. Set `order_id` in the same PATCH.
-- **BOM "not current" lock.** When a BOM's scope rules change after its last generation, the BOM is flagged not-current and is **locked in `draft`** — any move out of draft returns 400 until it is regenerated (UI-only). Editing scope rules (parameters, enabled, action, object types) silently invalidates the BOM until you regenerate it in the UI.
-- **SpareItem status** is free-form (`serviceable`/`damaged`/`missing`) and bypasses the rule system entirely — useful for inventory audits.
+- **PO `order_id` for `ordered`/`fulfilled`.** Moving a PO to `ordered` or `fulfilled` without an `order_id` is rejected (`approved` does not need one). Send `order_id` in the same PATCH.
+- **Received shipment needs a destination.** Moving a shipment to `received` (or creating one as `received` via a custom initial rule) without a `site` and/or `location` is rejected.
+- **BOM "not current" lock.** When a generated BOM's scope rules change, `is_current` is cleared and the BOM is **locked in `draft`** — any move out of draft returns 400 until `POST boms/<id>/generate/` runs again. (Ungenerated BOMs are never marked stale.)
+- **Scope rules and line items lock on non-draft BOMs.** Creating, editing, or deleting scope rules or BOM line items on an `approved`/`ordered`/`fulfilled`/`cancelled` BOM is rejected. Revert to `draft` first (the default `draft ↔ approved` rule allows it).
+- **PO line items lock on non-draft POs.** Same pattern for `po-line-items/`.
+- **Archived objects.** Child writes (scope rules, BOM/PO/shipment line items) are rejected while the parent is archived; the UI also blocks status changes on archived objects. `PATCH … {"archived": false}` first.
+- **`SpareItem.status`** is free-form (`serviceable`/`damaged`/`missing`) and bypasses the rule system — useful for inventory audits. Only `serviceable` items can be installed or count toward allocations.

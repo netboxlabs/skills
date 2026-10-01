@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Diode is a gRPC-based data ingestion service for NetBox. Instead of managing dependency order and object IDs via the REST API, you describe objects by name and the Diode reconciler resolves dependencies, creates missing objects, and performs upserts automatically.
 
-**This skill covers the open-source Python and Go SDKs** (diode-sdk-python v1.12.0 / diode-sdk-go v1.9.0), targeting NetBox **4.5.x–4.6.x**. The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
+**This skill covers the open-source Python and Go SDKs** (diode-sdk-python v1.14.1 / diode-sdk-go v1.12.0), targeting NetBox **4.5–4.7**. Both SDKs regenerated their entity set for NetBox 4.7.0 (python 1.14.0 / go 1.12.0). The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
 
 > **Your knowledge of Diode SDK may be outdated.** Entity types, SDK methods, and reconciler behavior evolve between releases. Prefer retrieval over pre-trained knowledge.
 
@@ -236,9 +236,13 @@ OTLPClientError           # OTLP export failures
 
 > **Note:** `DiodeClientError` inherits from `grpc.RpcError`, so `except grpc.RpcError` also catches it.
 
-### Auto-Retry on Auth Expiry
+### Auto-Retry on Auth Expiry and Auth Backoff
 
-The SDK automatically retries on `UNAUTHENTICATED` gRPC errors (token expiry), up to 3 times by default (`max_auth_retries` or `DIODE_MAX_AUTH_RETRIES`).
+Both SDKs retry on `UNAUTHENTICATED` gRPC errors (token expiry), up to 3 attempts by default (`max_auth_retries` / `DIODE_MAX_AUTH_RETRIES`). The same limit governs the OAuth2 token request itself:
+
+- **Token fetch backoff** *(python 1.13+, go 1.10+)*: a `429`, `500`, `502` or `503` from `/auth/token` is retried with exponential backoff (1s doubling, capped at 30s, with jitter); `Retry-After` is honoured on `429`/`503`. Any other non-200 status fails immediately with `DiodeConfigError` (Python) / an `authentication failed` error (Go).
+- **Proactive refresh** *(go 1.11.1+)*: the Go client renews the access token about one minute before its `expires_in` lifetime ends, and coalesces concurrent refreshes onto a single token request. The Python client re-authenticates only after an `UNAUTHENTICATED` response.
+- Set `DIODE_MAX_AUTH_RETRIES=1` for a single attempt with no retry (Go rejects values ≤ 0; Python does not validate the value).
 
 ### Recommended Pattern
 
@@ -267,12 +271,25 @@ except DiodeClientError as e:
 6. **gRPC 4MB limit** — use chunking for large batches
 7. **String shorthand limitations** — can't set nested object attributes (use full objects)
 8. **Metadata must be JSON-compatible** — strings, numbers, booleans, lists, dicts only
+9. **Service ports on 4.7** — use `port_mappings=["tcp/53", "udp/53"]`; `protocol` + `ports` still work but are deprecated in NetBox 4.7 (removed from the API in 5.0) and describe only single-protocol services
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02) — SDK python 1.14.x / go 1.12.0
+
+- **New entity types:** `CoolingSource`, `CoolingFeed`, `CoolingIntake`, `CoolingOutflow`, `ModuleBayType`, plus a minimal `User` (only used as `RackReservation.user`). Ingest these only against NetBox 4.7 with a matching Diode plugin.
+- **New fields:** `Device.cooling_method`; `DeviceType`/`ModuleType.cooling_method` + `end_of_life`; `ModuleType`/`ModuleBay.module_bay_types`; `Rack`/`RackType.cooling_capability` + `cooling_capacity`; `Interface.channels` + `channel_id` (channelized subinterfaces) and writable `Interface.mac_address`; `Service.port_mappings`. Full list in [references/entity-catalog.md](references/entity-catalog.md#netbox-47-additions).
+- **Reading back what Diode wrote on 4.7:** selection custom fields come back from REST/GraphQL as `{"value": ..., "label": ...}` objects; `config_context` is always present on devices/VMs. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
+
+### NetBox 4.6 — SDK python 1.12.0 / go 1.9.0
+
+- Added `CableBundle`, `RackGroup`, `VirtualMachineType`, `ScriptModule`, `DeviceConfig`.
 
 ## References
 
 | File | When to Load |
 |------|-------------|
-| [references/entity-catalog.md](references/entity-catalog.md) | Need the full list of 104 entity types and their fields |
+| [references/entity-catalog.md](references/entity-catalog.md) | Need the full list of 110 entity types and their fields, including the NetBox 4.7 additions |
 | [references/python-sdk-guide.md](references/python-sdk-guide.md) | Building a Python integration — setup, patterns, examples |
 | [references/go-sdk-guide.md](references/go-sdk-guide.md) | Building a Go integration — setup, patterns, examples |
 | [references/ingestion-patterns.md](references/ingestion-patterns.md) | Advanced patterns: chunking, dry run, OTLP, metadata |

@@ -13,12 +13,14 @@ NetBox Validation continuously validates infrastructure data against declarative
 
 > **Your knowledge of NetBox Validation may be outdated.** Check names, API fields, policy pack contents, and engine capabilities evolve between releases. Prefer retrieval over pre-trained knowledge.
 
+**Current plugin:** v1.14.1 (2026-09-18). NetBox 4.7 support arrived in 1.14.0; the plugin declares NetBox 4.4–4.7.x, and the docs require NetBox 4.5+ (NetBox Cloud). Run ≥ 1.14.0 on NetBox 4.7. See [Version Notes](#version-notes).
+
 ## Retrieval Sources
 
 | Source | URL / Method | Use for |
 |--------|-------------|---------|
-| Validation docs | `https://netboxlabs.com/docs/extensions/validation/` | Full reference, engines, check catalog |
-| Validation REST API | `https://netboxlabs.com/docs/extensions/validation/rest-api/` | Endpoint details |
+| Validation docs | `https://netboxlabs.com/docs/validation/` | Full reference, engines, check catalog, policy packs |
+| Validation REST API | `https://netboxlabs.com/docs/validation/api-reference/` | Endpoint details |
 | NetBox Platform MCP | If configured — 5 validation tools | Run validation, query compliance, manage policies |
 | NetBox MCP server | If configured — read-only access | Verify devices, policies, scores |
 
@@ -84,6 +86,8 @@ All three can coexist in a single policy. Config and graph engines are available
 | `passed` | All checks passed |
 | `failed` | One or more checks failed |
 | `error` | Engine error during execution |
+
+Since plugin 1.12.0 each run is linked to its NetBox background job, bounded by a job timeout, and orphaned runs (worker lost mid-run) are reaped rather than left in `running`.
 
 ### Result Statuses
 
@@ -254,6 +258,10 @@ Pre-built policy packs provide one-click installation:
 - **9 compliance frameworks** — CLOS Fabric, TIA-942, NIS2/DORA, NIST 800-53, NERC CIP, PCI-DSS, MANRS, ISO 27001, HIPAA Security Rule (2026)
 
 Installed packs create regular policies and rules. After installation, customize scope, parameters, triggers, and schedule. See [references/policy-packs.md](references/policy-packs.md).
+
+### Delete Rules and Policies
+
+Since plugin 1.13.0, `DELETE /rules/{id}/` and `DELETE /policies/{id}/` preserve historical run results — prior runs keep the rule's name and outcome, shown as "(deleted rule)". Policy-pack uninstall is still refused while runs reference the pack's policy; delete the policy directly if you need it gone.
 
 ### Clone and Import
 
@@ -437,6 +445,8 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/results/` | GET | Results (filter by run, device, status) |
 | `/findings/` | GET, POST | Findings (filter by run, severity, status) |
 | `/findings/{id}/` | GET, PUT, PATCH | Update finding status |
+| `/findings/summary/` | GET | Finding counts by status, severity, category (respects filters) |
+| `/findings/bulk-update-status/` | POST | `{"ids": [...], "status": "..."}` — bulk status change |
 | `/compliance/` | GET | Compliance scores (filter by device, policy) |
 | `/policy-packs/` | GET | List available policy packs |
 | `/policy-packs/{slug}/` | GET | Pack details with rule list |
@@ -444,6 +454,20 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/policy-packs/{slug}/uninstall/` | POST | Uninstall a pack |
 
 All endpoints under `/api/plugins/validation/`.
+
+---
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- Requires plugin **1.14.0+** (current 1.14.1). Checks evaluate NetBox data server-side, so check names and parameters are unchanged.
+- What changes is the core REST API an agent uses to **remediate** findings: selection custom fields read as `{"value", "label"}` (write the raw value — relevant after `custom_field_populated` / `asset_documentation_complete` failures), `config_context` is always present on device reads (`?exclude=config_context` ignored — use `?fields=`), and services use `port_mappings` (`["tcp/443"]`) instead of `protocol` + `ports`. Failed bulk fixes return per-object errors by `index`. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
+- Branch-context runs on 4.7 need netbox-branching **1.2.x** (1.1.x for NetBox 4.4–4.6) — see [netbox-branching](../netbox-branching/SKILL.md).
+
+### Plugin 1.12–1.13 (2026-08)
+
+- 1.12.0: run lifecycle hardening (job timeout, orphaned-run reaper, run↔job linkage). 1.13.0: rules and policies deletable without losing run history.
 
 ---
 

@@ -152,3 +152,4 @@ scheduled_at = DateTimeVar(label="Scheduled Time", required=False)
 - Use `regex` on `StringVar` for input validation without custom code
 - Chain `ObjectVar` fields with `$` references for cascading dropdowns
 - `ChoiceVar` values are always strings — cast in `run()` if needed
+- Never name a variable `_commit`, `_schedule_at`, `_interval`, or `_notifications` — these are reserved for the execution parameters NetBox renders alongside your fields; a variable with one of these names shadows the parameter and its value never reaches `run()`

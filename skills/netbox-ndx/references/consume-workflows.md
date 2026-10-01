@@ -30,6 +30,11 @@ Iterate results, inspect `eos_date` / `eol_announced` / `last_support_date`. The
 2. For each distinct device type, find its NDX import record (search by manufacturer + model, or match the NetBox object) and read `enrichment.eos_date` / `eol_announced` / `last_support_date`.
 3. Flag devices whose type is past or near EOS/EOL. Present each finding with its provenance — filter `provenance_entries` to entries whose `field` starts with `lifecycle.` and show `source` + `confidence` so the user can verify against the vendor bulletin.
 4. Null-check: not every type has lifecycle data, and on the free tier the values may be gated even when `has_lifecycle` is true.
+5. *(NetBox 4.7+)* Include core `end_of_life` in the pull (`GET /api/dcim/device-types/?fields=id,model,manufacturer,end_of_life`) and reconcile: with NDX plugin 0.7.0+ the import already writes `end_of_life` from a full-date `last_support_date` (setting `populate_core_end_of_life`, default on), so an empty core field usually means a partial NDX date, a pre-0.7.0 import that was never re-synced, or the setting is off — those are the write-back candidates. A core date that disagrees with NDX is a user edit (NDX preserves it) — flag it with the NDX provenance so the user can decide which is right. Write-back (one PATCH per type, or a bulk PATCH to `/api/dcim/device-types/` with `[{"id": ..., "end_of_life": "YYYY-MM-DD"}]`):
+   ```bash
+   PATCH /api/dcim/device-types/42/   {"end_of_life": "2030-04-30"}
+   ```
+   `end_of_life` needs a full date — NDX deliberately skips partial `YYYY-MM` values; if you expand one (e.g. to the last day of the month) say so in the report. On 4.5–4.6 there is no core field; keep the date in the NDX record (or a custom field) only.
 
 ## W4 — Populate an observability config from protocol metadata
 

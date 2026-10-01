@@ -72,6 +72,17 @@ The `device` variable is a full ORM instance. All relations are traversable:
 {% for iface in device.interfaces.all() %}
 {% for ip in iface.ip_addresses.all() %}
 {% for vc in device.virtual_chassis.members.all() %}
+{% for svc in device.services.all() %}
+
+{# Custom fields — raw values on every version (the {value,label} wrapping is REST/GraphQL only) #}
+{{ device.cf.environment }}           → "prod"
+
+{# NetBox 4.7+ #}
+{{ device.cooling_method }}          → "air" | "liquid" | "hybrid" | "immersion" | None
+{{ device.device_type.end_of_life }} → date or None
+{{ iface.channels }}                 → number of breakout channels on a channelized parent (or None)
+{{ iface.channel_id }}               → this subinterface's channel number (type "channel"), or None
+{{ svc.port_mappings }}              → ["tcp/80", "udp/53"]   (4.5/4.6: svc.protocol + svc.ports)
 ```
 
 ### Accessing Virtual Machine Relations
@@ -149,14 +160,25 @@ The standard Jinja2 built-in filters are available:
 
 **NetBox 4.6.2+** adds a built-in **`env()`** filter that returns a system environment variable's value: `{{ 'WEBHOOK_TOKEN_3' | env }}`. It only resolves names matched by the `JINJA_ENVIRONMENT_PARAMS` config allowlist (fnmatch wildcards); any other name returns `None`. On 4.6.1 and earlier, only the standard filters above are built in.
 
-Custom filters can be registered in NetBox configuration:
+Custom filters can be registered in NetBox configuration. The value must be a callable:
 
 ```python
 # configuration.py
+def uppercase(x):
+    return str(x).upper()
+
+# NetBox 4.7+ (old name JINJA2_FILTERS still accepted with a deprecation warning; removed in 5.0)
+JINJA_FILTERS = {
+    "uppercase": uppercase,
+}
+
+# NetBox 4.5 / 4.6
 JINJA2_FILTERS = {
-    "ipaddr": "netaddr.IPAddress",  # example custom filter
+    "uppercase": uppercase,
 }
 ```
+
+> **NetBox 4.7+ — plugin filters and context.** Plugins may register filters (`jinja_env.py` exposing a `filters` dict, or `register_jinja_filters()`) and inject template variables via `PluginConfig.get_jinja_context()`. Precedence, lowest to highest: NetBox built-in (`env`) → plugin-registered → instance `JINJA_FILTERS`, so an operator can always override a plugin filter in `configuration.py`. Plugin-injected context is global per render (no access to `device`); it appears as extra top-level names in **both** device/VM and general-purpose rendering. Example: netbox-custom-objects v0.6.1+ adds `custom_objects.<type_name>` and the `'<type_name>' | custom_objects` filter — see [netbox-custom-objects](../../netbox-custom-objects/SKILL.md). How to write these in a plugin: [netbox-plugin-development](../../netbox-plugin-development/SKILL.md).
 
 ### Environment Parameters
 

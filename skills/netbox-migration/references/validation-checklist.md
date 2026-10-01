@@ -50,11 +50,17 @@ Run through this checklist after each import phase. All three layers must pass b
 - [ ] No unexpected overlapping prefixes in same VRF
 - [ ] Aggregates cover all address space
 - [ ] Prefix utilization looks reasonable (not 0% or 100% unexpectedly)
+- [ ] Services match source ports — *(4.7)* compare `port_mappings` (`["tcp/443"]`); on 4.5–4.6 compare `protocol` + `ports`
 
 ### Hierarchy
 - [ ] Region → Site hierarchy matches geographic reality
 - [ ] Site → Location → Rack nesting is correct
 - [ ] Location hierarchy represents actual building/floor/room structure
+- [ ] Tree depth is what you expect — read the read-only `_depth` field on regions/site groups/locations (unchanged on 4.7; root nodes have `_depth: 0`). *(4.7)* In-NetBox scripts can no longer filter or order on `level` (hierarchies are `ltree`-backed) — use `get_descendants()`/`get_ancestors()`
+
+### Custom Fields
+- [ ] Custom field values populated where the source had them
+- [ ] *(4.7)* Selection/multi-selection values read back as `{"value", "label"}` objects — compare `["value"]`, never the whole object; on 4.5–4.6 the raw value is returned
 
 ## Layer 3: Operational Validation (matches live network)
 
@@ -113,6 +119,15 @@ for name in critical:
 unassigned = [ip.address for ip in nb.ipam.ip_addresses.filter(assigned_object_id="null")]
 if unassigned:
     errors.append(f"{len(unassigned)} unassigned IPs found")
+
+# --- Custom field read-back (works on 4.5–4.7) ---
+def cf_value(obj, name):
+    v = obj.custom_fields.get(name)
+    return v["value"] if isinstance(v, dict) else v   # 4.7 returns {"value", "label"} for selections
+
+for d in nb.dcim.devices.filter(tag="imported-from-cmdb", fields="id,name,custom_fields"):
+    if cf_value(d, "environment") not in ("prod", "staging", "dev"):
+        errors.append(f"Bad environment on {d.name}: {d.custom_fields.get('environment')}")
 
 # --- Report ---
 if errors:

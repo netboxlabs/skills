@@ -62,7 +62,7 @@ with DiodeClient(
     client.ingest(entities=entities)
 ```
 
-See [netbox-diode SKILL.md](../../netbox-diode/SKILL.md) for complete SDK patterns.
+See [netbox-diode SKILL.md](../../netbox-diode/SKILL.md) for complete SDK patterns. Current SDKs: diode-sdk-python 1.14.1, diode-sdk-go 1.12.0 (both with token-fetch backoff on 429/5xx; Go also refreshes the token before expiry) — long-running custom sources should stay on these lines.
 
 ## Supported Object Types
 
@@ -79,7 +79,9 @@ Any entity type the ingestion pipeline can represent is eligible for comparison.
 
 The specific fields compared depend on what the data source provides. If a data source only sends device name and serial number, only those fields are compared.
 
-> The set of comparable object types tracks what the Diode SDK can represent — as the SDK adds entities (e.g. the NetBox 4.6 additions like CableBundle, RackGroup, and VirtualMachineType), those types become eligible for drift detection too. Check the current Diode SDK entity catalog for the authoritative list.
+> The set of comparable object types tracks what the Diode SDK can represent — as the SDK adds entities, those types become eligible for drift detection too. diode-sdk-python 1.14.x / diode-sdk-go 1.12.0 (regenerated for NetBox 4.7.0) add `CoolingSource`, `CoolingFeed`, `CoolingIntake`, `CoolingOutflow` and `ModuleBayType`, plus new fields on existing types (`Interface.channels`/`channel_id`/`mac_address`, `Service.port_mappings`, `DeviceType`/`ModuleType.cooling_method`/`end_of_life`, `Rack.cooling_capability`/`cooling_capacity`). The 4.6 additions were `CableBundle`, `RackGroup`, `VirtualMachineType`. These only compare against a platform running the matching NetBox release. Check the [Diode SDK entity catalog](../../netbox-diode/references/entity-catalog.md#netbox-47-additions) for the authoritative list.
+>
+> **Service ports:** on NetBox 4.7 a service deviation compares `port_mappings` (`["tcp/53", "udp/53"]`); a data source still sending `protocol` + `ports` describes only single-protocol services and those fields are deprecated (removed in NetBox 5.0). Emit `port_mappings` from new integrations.
 
 ## Data Source Selection Guide
 

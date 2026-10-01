@@ -32,6 +32,9 @@ Authorization: Token 0123456789abcdef0123456789abcdef01234567
 | < 4.5.0 | v1 tokens only |
 | 4.5.0 | v2 introduced, v1 fully supported |
 | 4.6.0 | v1 deprecated |
+| 4.6.1 | Plaintext returned only once, at creation |
+| 4.7.0 | `token` read-only on REST create (server generates the plaintext) |
+| 4.7.2 | Tokens endpoint rejects `?background=true` (4.7.0/4.7.1 leaked plaintexts into job results) |
 | 5.0.0 | v1 removed |
 
 ## Server Configuration for v2 Tokens
@@ -84,14 +87,20 @@ def provision_token(netbox_url, username, password, description=None):
         headers={"Content-Type": "application/json"}
     )
     if response.status_code == 201:
-        return response.json()["key"]
+        return response.json()["token"]   # plaintext "nbt_<key>.<secret>"; "key" alone is only the public identifier
     else:
         raise Exception(f"Token provisioning failed: {response.text}")
 ```
 
 Use cases: CI/CD bootstrapping, dynamic environment provisioning, token rotation automation.
 
-> **NetBox 4.6.1+:** the plaintext token `key` is returned by the REST API **only once**, in the creation/provision response. Only a hash is stored afterward, so the full token is never retrievable again — capture and store `response.json()["key"]` immediately.
+> **NetBox 4.6.1+:** the plaintext is returned by the REST API **only once**, in the creation/provision response, as the `token` field. For v2 tokens `key` is just the public lookup identifier shown in listings (for legacy v1 tokens `key` *is* the plaintext). Only a hash is stored afterward, so the full token is never retrievable again — capture and store `response.json()["token"]` immediately.
+
+## NetBox 4.7 Token Changes
+
+- **`token` is read-only on create.** `POST /api/users/tokens/` always generates the plaintext; a client-supplied `token` value is ignored. Generate-then-distribute flows must read the plaintext from the response.
+- **Never create tokens with `?background=true`.** 4.7.0 and 4.7.1 stored the plaintext of tokens created via background bulk requests in the job result, readable by any user with `core.view_job`. 4.7.2 rejects such requests with 400. Run **≥ 4.7.2**; treat any token created that way on 4.7.0/4.7.1 as exposed — revoke and replace it, then delete the job records.
+- **Custom script execution needs a write-enabled token.** `POST /api/extras/scripts/<id>/` returns 403 for a token with write ability disabled, even if the user could run the script in the UI.
 
 ## IP Restrictions
 

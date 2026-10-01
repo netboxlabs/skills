@@ -51,13 +51,13 @@ NetBox's event rule system (introduced in 3.7) is the foundation for reactive au
 ### Event Rule Essentials
 
 - **Trigger scope**: Object type(s) + event type(s) (created, updated, deleted, job started/completed/failed/errored)
-- **Conditions**: Optional JSON conditions to filter — e.g., only fire when `status.value == "active"`
-- **Action types**: `webhook` (external HTTP call), `script` (run a custom script), `notification` (notify users)
+- **Conditions**: Optional JSON conditions to filter — e.g., only fire when `status.value == "active"`. On **4.7+** conditions can also test the change itself: `{"attr": "status", "op": "changed"}` plus `snapshots.prechange.<attr>` / `snapshots.postchange.<attr>` paths, and a `regex` operator
+- **Action types**: `webhook` (external HTTP call), `script` (run a custom script), `notification` (notify users), plus plugin-registered action types on 4.7+
 - **Processing**: Asynchronous via Redis/RQ — the user request completes without waiting
 
 ### Key Guidelines
 
-1. **Always scope with conditions** — Unscoped event rules fire on every matching change, creating noise and load. Use conditions to target specific statuses, roles, or tags.
+1. **Always scope with conditions** — Unscoped event rules fire on every matching change, creating noise and load. Use conditions to target specific statuses, roles, or tags. To fire only on a *transition* (status becomes active), use the 4.7 `changed` operator; on 4.5/4.6 compare `snapshots.prechange`/`postchange` in the body template instead. On 4.7+ a condition that references a non-existent attribute fails closed and logs — a rule that "stopped firing" after an edit is usually a typo.
 
 2. **Events are async** — Don't assume immediate execution. The event is queued to Redis/RQ and processed by a worker. Design receivers to handle delays.
 
@@ -72,6 +72,8 @@ NetBox's event rule system (introduced in 3.7) is the foundation for reactive au
    ```
 
 5. **Coalescing behavior** — Multiple changes to the same object within one request are coalesced. Only the final state triggers the event. Delete events eagerly serialize data since the object won't exist later.
+
+6. **Bound receiver time (4.7+)** — Set a per-webhook `timeout` (or `WEBHOOK_DEFAULT_TIMEOUT`, default 60 s); it must stay below `RQ_DEFAULT_TIMEOUT`. Receivers should acknowledge fast and process asynchronously.
 
 See [references/event-rules-and-webhooks.md](references/event-rules-and-webhooks.md) for payload format, HMAC signing, Jinja2 templating, and security considerations.
 
@@ -91,13 +93,13 @@ The `netbox.netbox` Ansible collection (GPLv3) provides modules, dynamic invento
 
 ### Key Guidelines
 
-1. **Set `config_context: False` in inventory** unless you need it — fetching config contexts adds significant overhead at scale.
+1. **Set `config_context: False` in inventory** unless you need it. On 4.5/4.6 this avoids an expensive per-device render server-side; on 4.7+ context is pre-rendered and always returned (`?exclude=config_context` is ignored), so the option only trims hostvars.
 
 2. **Use `query_filters`** to limit inventory scope server-side rather than filtering client-side.
 
 3. **Scope tokens properly** — Read-only tokens for inventory/lookup, write tokens only for modules that create/modify objects.
 
-4. **Version compatibility** — The collection supports the two most recent NetBox releases. Pin your collection version accordingly.
+4. **Version compatibility** — The collection's policy is the two most recent NetBox releases; the latest release (v3.23.0, 2026-05) is CI-tested through 4.5 and declares no 4.6/4.7 support yet. Pin the collection and test against your NetBox minor.
 
 5. **Filter with `device_query_filters`** — e.g., `has_primary_ip: 'true'` to exclude devices without management IPs.
 
@@ -111,7 +113,7 @@ The `e-breuninger/netbox` Terraform provider manages NetBox resources as infrast
 
 ### Key Guidelines
 
-1. **Pin provider version to match NetBox version** — NetBox makes breaking API changes in minor releases. Check the provider's compatibility matrix.
+1. **Pin provider version to match NetBox version** — NetBox makes breaking API changes in minor releases. Check the provider's compatibility matrix: v5.6.1+ covers NetBox 4.3–4.6.5; the v6.0 rewrite (RC as of 2026-09) targets 4.6.8–4.6.10; no release declares 4.7 support yet.
 
 2. **Understand `available_*` resource lifecycle** — `netbox_available_ip_address` and `netbox_available_prefix` allocate on create and cannot be "updated." They have unique lifecycle behavior compared to regular resources.
 
@@ -158,13 +160,32 @@ These apply across all automation approaches:
 
 - **Token management**: Use scoped tokens with minimal permissions. Prefer v2 tokens (NetBox 4.5+) with `Bearer` auth. See [netbox-api-integration](../netbox-api-integration/SKILL.md) for token format details.
 
-- **Rate limiting**: Large automation runs (bulk Ansible plays, Terraform applies) should implement backoff to avoid overwhelming the NetBox API.
+- **Rate limiting**: Large automation runs (bulk Ansible plays, Terraform applies) should implement backoff to avoid overwhelming the NetBox API. On **4.7+**, large custom bulk writes can use `?background=true` (HTTP 202 + job URL; poll the job for the result) to avoid proxy timeouts — see [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 - **Pagination**: All tools (pynetbox, Terraform provider, Ansible collection) handle pagination internally, but be aware of it when writing custom integrations. NetBox **4.6** adds cursor-based `start` pagination (an efficient alternative to deep `offset` scans) — see [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 - **Idempotency**: Ansible modules are idempotent by design. Terraform is declarative. Webhooks are fire-and-forget — implement idempotency on the receiver side.
 
-- **Testing**: Use NetBox's official Docker image for CI/CD testing environments. Spin up a disposable instance for integration tests.
+- **Testing**: Use NetBox's official Docker image for CI/CD testing environments (`netboxcommunity/netbox:v4.7-5.1.1`; tag = `v<netbox>-<netbox-docker>`). Spin up a disposable instance for integration tests.
+
+---
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- **Snapshot-aware conditions**: `changed`/`unchanged` operators, `snapshots.prechange.<attr>` / `snapshots.postchange.<attr>` paths, `regex` operator; unresolvable attributes fail closed and log to `netbox.event_rules`. Snapshot values are raw (`status`, not `status.value`).
+- **Webhook context**: `username` and `request_id` **removed** — use `request.user` / `request.id`. `send_webhook()` lost its `username` argument: **drain RQ queues before upgrading** or queued webhook jobs fail with `TypeError`.
+- **Webhook timeout**: per-webhook `timeout` field and `WEBHOOK_DEFAULT_TIMEOUT` (default 60); must be less than `RQ_DEFAULT_TIMEOUT`, else NetBox refuses to start / save.
+- **Event rules**: `action_object_type` optional; plugins register action types (`EventRuleAction`); `action_is_available` flags rules whose plugin is gone.
+- **Payload/API deltas that reach automation tools**: selection custom fields are `{value,label}` objects in REST (and thus webhook `data`); `config_context` always in device/VM output; `ipam.Service` `protocol`/`ports` deprecated for `port_mappings`; bulk write errors are per-object; `?background=true` on bulk writes.
+- **Ecosystem**: netbox-docker 5.x (`v4.7-5.1.1`) requires NetBox 4.7+; Ansible collection and Terraform provider have not declared 4.7 support (see references).
+
+### NetBox 4.6 (2026-05-05)
+
+- Webhook context gains the `request` object; `username`/`request_id` deprecated.
+- Cursor-based `start` pagination for large reads.
+- On 4.5 only `username`/`request_id` exist in the webhook context.
 
 ---
 

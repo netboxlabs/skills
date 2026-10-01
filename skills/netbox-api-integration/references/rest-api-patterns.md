@@ -60,6 +60,55 @@ requests.delete(f"{API_URL}/dcim/devices/", headers=headers, json=[
 
 **Signals/webhooks:** Each object in the array triggers its own Django signals and webhook events. This is intentional for proper validation; bulk operations are not true database-level bulk inserts.
 
+### Per-Object Bulk Errors (NetBox 4.7+)
+
+A failed bulk write no longer stops at the first error. The body is `{"detail": ..., "errors": [...]}` with one entry per failing object: keyed by `index` (position in the submitted list) for creates and for entries that could not be interpreted (missing or non-numeric `id`), and by `id` for updates and deletes once objects are resolved. The status is 403 if any object is permission-denied, else 409 (delete blocked by dependents), else 400. The batch is still rolled back.
+
+```json
+{"detail": "1 of 3 objects failed validation.",
+ "errors": [{"index": 1, "errors": {"slug": ["This field may not be blank."]}}]}
+```
+
+```python
+resp = requests.post(f"{API_URL}/dcim/sites/", headers=headers, json=sites, timeout=30)
+if resp.status_code >= 400:
+    body = resp.json()
+    for err in body.get("errors", []):                       # 4.7+
+        key = sites[err["index"]]["name"] if "index" in err else f"id={err['id']}"
+        print(key, err["errors"])
+    if "errors" not in body:                                 # 4.5–4.6: first failure's field errors only
+        print(body)
+```
+
+### Background Processing (NetBox 4.7+)
+
+Append `?background=true` to a bulk POST/PUT/PATCH/DELETE to run it as a job instead of holding the connection open through a proxy timeout:
+
+```python
+import time
+
+resp = requests.patch(f"{API_URL}/dcim/devices/?background=true", headers=headers,
+                      json=updates, timeout=30)
+resp.raise_for_status()                          # 202 Accepted
+job_url = resp.json()["job"]["url"]              # also in the Location header
+
+while True:
+    job = requests.get(job_url, headers=headers, timeout=30).json()
+    if job["status"]["value"] in ("completed", "errored", "failed"):
+        break
+    time.sleep(2)
+
+result = job["data"]                             # {"status_code": 200, "data": [...]} — the synchronous response
+if job["status"]["value"] != "completed" or result["status_code"] >= 400:
+    raise RuntimeError(job.get("error") or result["data"])
+```
+
+- **202 means queued, not validated.** Malformed or invalid payloads fail the *job*, not the request. Always poll to a terminal status and check `data.status_code`.
+- Applies only to a JSON list on a list endpoint; single-object writes ignore `background`.
+- Cannot be combined with `If-Match` → 400. No running RQ worker → 503.
+- `/api/users/tokens/` rejects it with 400 on 4.7.2+ — 4.7.0/4.7.1 stored created token plaintexts in job results. Never create tokens in the background.
+- `fields`/`omit`/`brief` are not applied to the stored result, and any user with `core.view_job` can read it.
+
 ## Pagination
 
 Default: 50 items. Maximum: 1000. Always specify `limit` explicitly.
@@ -156,16 +205,20 @@ Use `?fields=` when you need specific non-brief fields. Use `?brief=True` for si
 
 ## Excluding Fields
 
-`?exclude=field1,field2` omits specific fields:
+`?omit=field1,field2` (NetBox 4.5.2+) drops the named fields from full responses. `fields` and `omit` are mutually exclusive — if both are passed, `fields` wins.
+
+`?exclude=config_context` is a device/VM-specific switch whose effect depends on version:
+
+- **4.5–4.6**: config context is rendered per object on every request — the single most expensive field (10-100x slower). Always send `?exclude=config_context` on list queries (`?omit=config_context` on 4.5.2+ skips the render the same way, since the field is dropped before serialization).
+- **4.7+**: config context is pre-rendered and cached on the object, always included, and `?exclude=config_context` is **silently ignored**. The render cost is gone; to shrink payloads use `?fields=`, `?brief=True`, or `?omit=config_context`.
 
 ```python
-# CRITICAL: Exclude config_context from device/VM lists
+# 4.5–4.6 only (no-op on 4.7+)
 requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)
+
+# 4.5.2 through 4.7: skips rendering on 4.5/4.6, trims the payload on 4.7
+requests.get(f"{API_URL}/dcim/devices/?omit=config_context", headers=headers)
 ```
-
-Config context is the single most expensive field — 10-100x slower with it included.
-
-`?omit=field1,field2` (NetBox 4.5.2+) is a companion to `?fields=`/`?exclude=` that drops the named fields from full responses. `fields` and `omit` are mutually exclusive — if both are passed, `fields` wins.
 
 ## Optimistic Concurrency (ETag / If-Match, NetBox 4.6+)
 
@@ -240,6 +293,8 @@ requests.get(f"{API_URL}/dcim/devices/?cf_environment=production&cf_tier=1", hea
 requests.get(f"{API_URL}/dcim/devices/?cf_deployment_date__gte=2024-01-01", headers=headers)
 ```
 
+> **NetBox 4.7+**: selection and multi-selection custom field values are *returned* as `{"value": "production", "label": "Production"}` (multi-select: a list of them). Filters and writes still take the raw value (`cf_environment=production`, `"custom_fields": {"environment": "production"}`) — sending the `{value, label}` object back, e.g. in an unmodified GET→PUT round-trip, fails validation.
+
 ### Avoid `q=` at Scale
 
 The `?q=` search parameter searches multiple fields simultaneously without index optimization. It becomes extremely slow with large datasets, especially devices with primary IPs.
@@ -297,18 +352,23 @@ headers["X-Request-ID"] = str(uuid.uuid4())
 |------|---------|--------|
 | 200 | Success (GET/PATCH/PUT) | Process data |
 | 201 | Created (POST) | Process data |
+| 202 | Accepted (`?background=true` bulk write, 4.7+) | Poll `job.url` — not a success signal |
 | 204 | No Content (DELETE) | Success |
-| 400 | Validation error | Fix input — response body has field-level errors |
+| 400 | Validation error | Fix input — response body has field-level errors (per-object `errors` list for bulk on 4.7+) |
 | 401 | Unauthorized | Check token format and validity |
 | 403 | Forbidden | Check permissions, IP restrictions |
 | 404 | Not Found | Check endpoint/ID |
+| 409 | Conflict (bulk delete blocked by dependent objects; branch sync/merge conflicts) | Remove dependents or resolve conflicts, then retry |
 | 412 | Precondition Failed (`If-Match` ETag mismatch, 4.6+) | Re-read object, reconcile, retry with new ETag |
 | 429 | Rate Limited | Backoff using `Retry-After` header |
 | 500+ | Server Error | Retry with exponential backoff |
+| 503 | No RQ worker for `?background=true` (4.7+), or maintenance mode | Retry synchronously or later |
 
-Error response format:
+Error response format (single object on all versions; bulk on 4.5–4.6):
 ```json
 {"name": ["This field is required."], "site": ["Invalid pk \"999\" - object does not exist."]}
 ```
+
+Bulk on 4.7+: `{"detail": "...", "errors": [{"index" | "id": N, "errors": {...}}]}` — see [Per-Object Bulk Errors](#per-object-bulk-errors-netbox-47).
 
 Implement retry logic with exponential backoff for 429 and 500+ errors. Always set a request timeout (30s default).

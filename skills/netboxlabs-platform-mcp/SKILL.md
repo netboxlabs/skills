@@ -11,7 +11,7 @@ license: Apache-2.0
 
 # NetBox Labs Platform MCP Server
 
-The **Platform MCP Server** is a hosted Model Context Protocol server (on NetBox Cloud) that puts a NetBox instance behind an MCP tool surface so an agent can read and modify NetBox data. It is distinct from the open-source [`netbox-community/netbox-mcp-server`](https://github.com/netbox-community/netbox-mcp-server): the platform server adds **Code Mode**, per-user auth, dynamic plugin/model detection, and first-party product integrations (Assurance, Discovery).
+The **Platform MCP Server** is a hosted Model Context Protocol server (on NetBox Cloud) that puts a NetBox instance behind an MCP tool surface so an agent can read and modify NetBox data. It is distinct from the open-source [`netbox-community/netbox-mcp-server`](https://github.com/netbox-community/netbox-mcp-server) (v1.2.1, 2026-06-17: optional bearer-token auth on its HTTP transport; rejects `__in` lookups in favor of list values — the same rule as below): the platform server adds **Code Mode**, per-user auth, dynamic plugin/model detection, and first-party product integrations (Assurance, Discovery).
 
 > **Your knowledge of this server may be outdated.** It is Public Preview; tool inventories, helper signatures, and available namespaces are generated live per deployment and evolve. Always discover the real surface (schema search / tool list) before acting — never assume an object type, endpoint, or helper exists.
 
@@ -19,7 +19,7 @@ The **Platform MCP Server** is a hosted Model Context Protocol server (on NetBox
 
 | Source | URL / Method | Use for |
 |--------|-------------|---------|
-| Platform MCP docs | `https://netboxlabs.com/docs/cloud/platform-mcp-server` | Setup, client configs, auth, modes |
+| Platform MCP docs | `https://netboxlabs.com/docs/platform-mcp/` | Setup, client configs, auth, modes, connection options |
 | Community MCP server | `https://github.com/netbox-community/netbox-mcp-server` | The open-source read-only alternative |
 | Live server | The connected MCP server itself | The authoritative tool list + `netbox_search_schema` are the source of truth |
 
@@ -28,6 +28,7 @@ The **Platform MCP Server** is a hosted Model Context Protocol server (on NetBox
 - **Endpoint:** `https://<instance>.cloud.netboxapp.com/mcp`
 - **Transport:** MCP over **streamable HTTP** (no stdio — it is a networked, hosted server, not a local subprocess).
 - **Auth:** `Authorization: Bearer nbt_<token>` — a **NetBox v2 API token** (prefix `nbt_`, available on NetBox 4.5+). With per-user auth, your own token's NetBox RBAC applies to every call.
+- **Connection options** (query parameters on the endpoint URL, strict lowercase): `?mode=discrete|code|both` picks the tool surface for that connection (`discrete` on every plan; `code`/`both` need a plan with Code Mode) and `?read_only=true` restricts the connection to queries on any plan. Omit both for your plan's defaults; asking for something your plan lacks fails the connection with HTTP 400. An instance can be locked read-only by NetBox Labs support (then `read_only=false` is rejected).
 - Customers enable the server on their instance via NetBox Labs support.
 
 Any MCP-over-streamable-HTTP client works (Claude Code/Desktop, Cursor, VS Code, ChatGPT Developer Mode). The docs page has copy-paste client configs.
@@ -123,6 +124,13 @@ api(method, endpoint, params=None, data=None)                    # raw escape ha
    result = devices['results']
    ```
 
+### NetBox-version footguns (the helpers pass NetBox's representation through)
+
+- **Selection custom fields** — on NetBox **4.7+** `obj['custom_fields']['env']` is `{'value': 'prod', 'label': 'Production'}` (a list of them for multi-select); on 4.5–4.6 it is the raw value. Compare portably (`v['value'] if isinstance(v, dict) else v`) and always **write the raw value** (`update('dcim.device', id, {'custom_fields': {'env': 'prod'}})`).
+- **`config_context`** — on 4.7+ it is always present in device/VM reads (`exclude` is ignored); on 4.5–4.6 it is rendered per object. Either way, `fields=[...]` is the fix — never pull whole device rows.
+- **Services** — 4.7+ uses `port_mappings` (`['tcp/443', 'udp/53']`); `protocol`/`ports` are deprecated (populated only for single-protocol services, removed in 5.0). Filter with `{'port': 443}` / `{'protocol': 'tcp'}`, not `protocol__ic`.
+- **Bulk writes** — 4.7+ returns per-object errors on a failed `bulk_create`/`bulk_update` (`errors[].index` = position in your list, `errors[].id` for updates); the batch is still all-or-none, so fix those entries and resubmit. 4.5–4.6 reports only the first failure. Full detail: [netbox-api-integration](../netbox-api-integration/SKILL.md).
+
 ### When to use `rediscover_netbox()`
 
 Only when you have a **specific reason** to believe the tool inventory is stale: the user just installed/uninstalled a plugin, a tool you genuinely expected returns "tool not found," or a tool you no longer expect is still advertised. It is also the recovery path after a failed plugin registration. **Do NOT** call it before every operation, to "refresh" NetBox *data* (helpers are always live), or "just to be sure" at session start — each call costs a round-trip plus re-registration.
@@ -169,6 +177,14 @@ These are **entitlement-gated** — present only when your tenant has the produc
 8. **Not projecting `fields=`** → oversized payloads, hitting the result cap, wasted tokens (both modes).
 9. **Assuming a product/plugin namespace exists** → it's entitlement-gated. Discover it.
 10. **`NameError` on an undefined name** (`ip_network`, `re`, …) → only injected helpers + allowed builtins exist.
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- The server's own tool names, modes, and auth are unchanged per the docs. What changes is the NetBox data the helpers return: `{value, label}` selection custom fields, `config_context` always present, `port_mappings` on services, per-object bulk errors — see [NetBox-version footguns](#netbox-version-footguns-the-helpers-pass-netboxs-representation-through).
+- `?background=true` (202 + job) is a raw REST option on bulk writes; the documented bulk helpers are synchronous. The only place to pass it is the `api()` escape hatch (`params={'background': 'true'}`), polling the job (`core.job`) in a later program — confirm support via `netbox_search_schema` first, and never create API tokens that way (rejected since 4.7.2).
+- Plugin namespaces (branching, changes, custom objects) need plugin releases that support NetBox 4.7 — e.g. netbox-branching **1.2.x** is 4.7-only (1.1.x for 4.4–4.6). Version lines: [netbox-branching](../netbox-branching/SKILL.md), [netbox-changes](../netbox-changes/SKILL.md), [netbox-custom-objects](../netbox-custom-objects/SKILL.md).
 
 ## References
 

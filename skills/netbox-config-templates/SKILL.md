@@ -101,6 +101,10 @@ Design data structures with this in mind. Use dicts with unique keys when you ne
 
 For hierarchical models (Region, Site Group, etc.), a context assigned to a parent also applies to all descendants. A context assigned to "Americas" region matches devices in "US-East" sub-region.
 
+### Pre-Rendered Cache (NetBox 4.7+)
+
+On 4.7 the merged result is **pre-rendered and cached on each device/VM**. Any upstream change (a config context created/edited/deleted, or a device/VM attribute that affects which contexts apply) invalidates the cache and a non-blocking background job re-renders it; in the window between the two, reads fall back to on-demand rendering, so results are never stale. Merge semantics are unchanged. After upgrading, the upgrade script runs `manage.py rebuild_config_context_cache` (one `UPDATE` per device/VM; safe to interrupt and re-run). Bulk writes that bypass signals (`queryset.update()`) do not invalidate the cache — run `rebuild_config_context_cache --force` afterwards. On 4.5/4.6 config context is computed on every read.
+
 For a deep dive on merging, see [references/config-context-merging.md](references/config-context-merging.md). For config context data modeling best practices, see [netbox-data-modeling](../netbox-data-modeling/SKILL.md).
 
 ## Writing Templates
@@ -175,7 +179,9 @@ ip route {{ pfx.prefix }} Management
 ### Jinja2 Environment
 
 - Templates run in a **SandboxedEnvironment** — no file I/O, no arbitrary imports
-- Custom filters can be added via `JINJA2_FILTERS` in NetBox configuration
+- Custom filters can be added in NetBox configuration via **`JINJA_FILTERS`** *(4.7+; the old name `JINJA2_FILTERS` still works but is deprecated and removed in 5.0)* / **`JINJA2_FILTERS`** *(4.5/4.6)*. Filter precedence on 4.7, lowest to highest: built-in (`env`) → plugin-registered → instance `JINJA_FILTERS`.
+- **Plugins can register Jinja filters and inject template context variables (NetBox 4.7+)** via `jinja_env.py` / `register_jinja_filters()` and `PluginConfig.get_jinja_context()` — see [netbox-plugin-development](../netbox-plugin-development/SKILL.md) for the how-to. Plugin context is global (not per-object) and must not reuse app-label names like `dcim`.
+- **Custom Objects in templates (NetBox 4.7+, netbox-custom-objects v0.6.1+)**: `custom_objects.<type_name>.filter(device=device)` or `'<type_name>' | custom_objects` exposes custom object types by internal name; on 4.5/4.6 `custom_objects` is simply absent. See [netbox-custom-objects](../netbox-custom-objects/SKILL.md).
 - **Built-in `env()` filter (NetBox 4.6.2+)** — returns a system environment variable's value: `{{ 'WEBHOOK_TOKEN_3' | env }}`. Gated by the `JINJA_ENVIRONMENT_PARAMS` config list (an fnmatch wildcard allowlist of permitted variable names); returns `None` for any name not matched. On 4.6.1 and earlier there are no built-in custom filters — only standard Jinja2 filters.
 - Per-template `environment_params` can customize behavior (e.g., `undefined: jinja2.StrictUndefined`), but on **NetBox 4.6.1+** the keys are **allowlisted** — see below.
 
@@ -262,7 +268,9 @@ For detailed API examples including pynetbox and error handling, see [references
 
 ### Performance
 
-- **Exclude config_context from list endpoints:** `GET /api/dcim/devices/?exclude=config_context` — computing merged config context per device is expensive. Always exclude on bulk queries.
+- **Config context on list endpoints:**
+  - **NetBox 4.7+**: merged config context is **pre-rendered and cached** on each device/VM and **always included** in the REST representation; `?exclude=config_context` is **silently ignored** (harmless if a shared client still sends it). List calls are cheap — the cost moved to a background re-render job.
+  - **NetBox 4.5/4.6**: computing merged config context per device is expensive — always send `GET /api/dcim/devices/?exclude=config_context` on bulk queries when you don't need it.
 - **ORM queries in templates** have no guardrails — avoid unbounded `.all()` on large tables.
 
 ### Template Behavior
@@ -277,6 +285,20 @@ For detailed API examples including pynetbox and error handling, see [references
 - **Lists replace, don't append** — the most common surprise. See merge rules above.
 - **POST data silently overrides config context** — intentional but can be confusing when debugging unexpected values.
 - **environment_params vary per template** — undefined variable handling may differ between templates if configured differently.
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- **Config context pre-rendered and cached** per device/VM, invalidated on upstream changes and re-rendered by a background job (on-demand fallback in between). `config_context` is **always** in device/VM REST output; `?exclude=config_context` is silently ignored. `DeviceWithConfigContextSerializer`/`VirtualMachineWithConfigContextSerializer` merged into the base serializers. Upgrade runs `rebuild_config_context_cache`.
+- **`JINJA2_FILTERS` renamed `JINJA_FILTERS`** (old name accepted with a deprecation warning until 5.0).
+- **Plugins can register Jinja filters and inject context variables** (`jinja_env.py`, `register_jinja_filters()`, `get_jinja_context()`); precedence built-in → plugin → instance `JINJA_FILTERS`. netbox-custom-objects v0.6.1+ uses this to expose `custom_objects.<type>` / `'<type>' | custom_objects`.
+- New data reachable from templates: `device.cooling_method`, interface `channels`/`channel_id` (channelized subinterfaces of type `channel`), service `port_mappings` (list of `"tcp/80"` strings; `protocol`/`ports` deprecated), `device_type.end_of_life`. Selection custom fields still read as raw values via `device.cf` / `custom_field_data` in templates — only the REST/GraphQL representation became `{value, label}`.
+- Platform: PostgreSQL 15+, Redis 6.0+, `ltree` extension; recommend **4.7.2+**.
+
+### NetBox 4.6 (2026-05-05)
+
+- `config_template_id` override on render-config (4.6.0); `render_jinja2(..., debug=True)` (4.6.0); `environment_params` allowlist (4.6.1, CVE-2026-29514); built-in `env` filter gated by `JINJA_ENVIRONMENT_PARAMS` (4.6.2); autoescaping explicitly disabled for config templates rendered via `SandboxedEnvironment` (4.6.5).
 
 ## References
 

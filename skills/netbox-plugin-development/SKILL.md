@@ -50,7 +50,7 @@ from netbox.tables import NetBoxTable, columns
 
 # FilterSets
 from netbox.filtersets import NetBoxModelFilterSet
-from django_filters import FilterSet  # for @register_filterset
+from utilities.filters import register_filterset  # 4.5+: UI lookup modifiers
 
 # REST API
 from netbox.api.serializers import NetBoxModelSerializer
@@ -89,6 +89,9 @@ netbox_myplugin/
 ├── templates/netbox_myplugin/
 │   └── myplugin_model.html  # Detail view templates
 ├── template_content.py      # Template extensions (auto-discovered)
+├── event_rules.py           # EventRuleAction subclasses (4.7+, auto-discovered)
+├── jinja_env.py             # Config-template Jinja filters (4.7+, auto-discovered)
+├── graphql_extensions.py    # Fields/filters on core GraphQL types (4.7+, auto-discovered)
 └── tests/
     ├── test_models.py
     ├── test_views.py
@@ -122,9 +125,9 @@ class MyPluginConfig(PluginConfig):
 config = MyPluginConfig  # MUST be module-level variable named 'config'
 ```
 
-**Auto-discovery:** NetBox automatically discovers modules at `navigation.menu`,
-`navigation.menu_items`, `template_content.template_extensions`, `search.indexes`,
-`graphql.schema`, and more. No manual registration needed for these.
+**Auto-discovery:** NetBox automatically discovers `navigation.menu`, `navigation.menu_items`,
+`template_content.template_extensions`, `search.indexes`, `graphql.schema`, and *(4.7+)*
+`event_rules.event_rule_actions`, `jinja_env.filters`, `graphql_extensions.type_extensions`/`.filter_extensions`.
 
 ---
 
@@ -218,18 +221,9 @@ from . import models
 urlpatterns = get_model_urls('netbox_myplugin', models)
 ```
 
-### Extending Core Model Views with Tabs
-
-```python
-@register_model_view(Device, 'access_lists', path='access-lists')
-class DeviceAccessListsView(ObjectChildrenView):
-    queryset = Device.objects.all()
-    child_model = AccessList
-    table = AccessListTable
-    tab = ViewTab(label='Access Lists', badge=lambda obj: obj.accesslists.count())
-```
-
-See [references/views-and-api.md](references/views-and-api.md) for all view classes and URL patterns.
+See [references/views-and-api.md](references/views-and-api.md) for all view classes, URL patterns,
+`ViewTab` (adding tabs to core object views), declarative layouts + breadcrumbs *(4.7)*, GraphQL
+core-type extensions *(4.7)*, and custom event rule actions *(4.7)*.
 
 ---
 
@@ -309,11 +303,12 @@ class AccessListForm(NetBoxModelForm):
 ### Table
 
 ```python
+import django_tables2 as tables
 from netbox.tables import NetBoxTable, columns
 
 class AccessListTable(NetBoxTable):
-    name = columns.LinkColumn()
-    device = columns.LinkColumn()
+    name = tables.Column(linkify=True)    # no LinkColumn in netbox.tables.columns
+    device = tables.Column(linkify=True)
     type = columns.ChoiceFieldColumn()
     tags = columns.TagColumn()
 
@@ -345,7 +340,7 @@ class AccessListFilterSet(NetBoxModelFilterSet):
 > (e.g., `name__ic`, `device_id__n`) to appear in the UI filter forms.
 
 See [references/forms-tables-filtersets.md](references/forms-tables-filtersets.md) for
-bulk edit forms, import forms, filter form widgets, and all field types.
+bulk edit/import/filter forms, `GenericObjectChoiceField` *(4.7)*, and django-tables2 v3 notes *(4.7)*.
 
 ---
 
@@ -440,14 +435,16 @@ Use `pyproject.toml` (modern) or `setup.py`:
 [project]
 name = "netbox-myplugin"
 version = "1.0.0"
-dependencies = []   # omit "netbox": pip would install a second copy from PyPI
+dependencies = []   # never list "netbox" here — see note below
 
 [project.entry-points."netbox.plugins"]
 netbox_myplugin = "netbox_myplugin:config"
 ```
 
 > **Note:** The entry point key must match `PluginConfig.name` and point to the
-> module-level `config` variable.
+> module-level `config` variable. Never list `netbox` in `dependencies`: NetBox is published
+> to PyPI since 4.7, so pip would install a second NetBox into the venv next to the real one —
+> declare compatibility with `min_version`/`max_version` on `PluginConfig` instead.
 
 See [references/packaging.md](references/packaging.md) for versioning strategy,
 publishing to PyPI, and version compatibility matrix.
@@ -462,7 +459,7 @@ publishing to PyPI, and version compatibility matrix.
 4. **Missing `search()` on filterset** — `?q=` won't work without it
 5. **`models` on TemplateExtension** — must be list of `'app.model'` strings, not classes; `None` = global
 6. **Heavy imports in `__init__.py`** — use `ready()` for signals and deferred imports (fixed in 4.5.2 but still best practice)
-7. **`max_version` too strict** — use `'4.6.99'` (or your top minor's `.99`) not `'4.5.0'` to allow patches
+7. **`max_version` too strict** — use `'4.7.99'` (or your top minor's `.99`) not `'4.5.0'` to allow patches
 8. **GraphQL uses Strawberry** since 4.0 — Graphene patterns will not work
 9. **`@register_filterset`** (4.5+) — without it, lookup modifiers won't appear in UI
 10. **Permissions** — format is `<plugin_name>.view_<model>`, `<plugin_name>.add_<model>`, etc. **Custom actions (4.6.0+):** declare extra actions via your model's `Meta.permissions`; NetBox auto-registers them as actions selectable in the ObjectPermission form (preferred over ad-hoc permission checks).
@@ -472,9 +469,11 @@ publishing to PyPI, and version compatibility matrix.
 ## Version Notes
 
 ### NetBox 4.7 (2026-09-02)
-- **PostgreSQL 15+** required — NetBox's system check fails on 14, including under `manage.py test`
-- **Removed:** `DEFAULT_ACTION_PERMISSIONS`, legacy view actions, `registry['models']` (use `ObjectType.objects.public()`), `OptionalLimitOffsetPagination` (use `NetBoxPagination`), and NetBox's `querystring` tag (use Django's, without `request`: `{% querystring page=1 %}`)
-- **Core trees moved from MPTT to ltree** (Region, Location, Platform, …): `level` can't be filtered/ordered on; `get_root()`/`get_family()`/`is_leaf_node()` are gone. `NestedGroupModel` is deprecated — see [model-patterns](references/model-patterns.md)
+- **PostgreSQL 15+** (system check fails on 14, including under `manage.py test`) and **Django 6.1**; NetBox is on PyPI (never depend on `netbox` in `pyproject.toml`); recommend **≥4.7.2** — 4.7.0/4.7.1 recorded plaintext API tokens created via background bulk requests in job results
+- **Removed:** `DEFAULT_ACTION_PERMISSIONS`, legacy view actions, `registry['models']` (use `ObjectType.objects.public()`) and `registry['denormalized_fields']`, `OptionalLimitOffsetPagination` (→ `NetBoxPagination`), `ExpandableIPAddressField`/`expand_ipaddress_pattern()` (→ `*IPNetwork*`), `populate_custom_field_defaults()`, `OwnerMixin`'s reverse relation (`site_set`), Django `EMAIL_*` settings, and NetBox's `querystring` tag (use Django's, without `request`: `{% querystring page=1 %}`) — full checklist in [netbox-4.7-migration](references/netbox-4.7-migration.md)
+- **Changed:** `custom_fields`/`get_for_model()` return lists; django-tables2 v3 (`querystring_replace`, no `RelatedLinkColumn`); filterset test mixins renamed `*TestMixin`; search indexing deferred to on-commit (tests: `captureOnCommitCallbacks(execute=True)`); plugin viewsets inherit `?background=true` + per-object bulk errors
+- **Core trees moved from MPTT to ltree** (Region, Location, Platform, …): `level` can't be filtered/ordered on; `get_root()`/`get_family()`/`is_leaf_node()`/`move_to()`/`insert_at()` are gone. `NestedGroupModel` is deprecated → `NestedLtreeGroupModel`; plugins that installed ltree triggers on 4.7.0 need a `ReinstallLtreeTriggers` migration — see [model-patterns](references/model-patterns.md)
+- **New plugin extension points** (all need `min_version='4.7.0'`): core GraphQL type/filter extensions (`graphql_extensions.py`), custom event rule actions (`EventRuleAction`), Jinja filters + config-template context (`jinja_env.py`, `get_jinja_context()`), breadcrumbs on layouts, `GenericObjectChoiceField`, choice descriptions
 
 ### NetBox 4.6 (2026)
 - **Django 6.0** (was 5.2 in 4.5) — ensure code, migrations, and dependencies are Django 6.0-compatible; set `min_version='4.6.0'` for any plugin using 4.6-only APIs below

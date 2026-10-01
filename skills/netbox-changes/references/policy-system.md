@@ -10,8 +10,19 @@ For the CR to reach `approved`, ALL enabled rules in the policy must pass.
 1. The policy evaluates all enabled rules against the CR
 2. Each rule checks the latest non-stale review per eligible user
 3. Reviews are stale if new changes have been made in the branch since the review was submitted
-4. The count of `approved` (non-stale) reviews must be ≥ `min_reviews`
-5. ALL rules must pass → policy passes → CR can become `approved`
+4. *(1.1.0+)* If the policy has `require_independent_review: true`, reviews by the CR's `owner` are skipped
+5. The count of `approved` (non-stale) reviews must be ≥ `min_reviews`
+6. ALL rules must pass → policy passes → CR can become `approved`
+
+## Policy Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique name |
+| `description` / `comments` | string | Optional |
+| `is_default` *(1.1.0+)* | bool (default False) | Pre-selected on the **UI** CR form. At most one policy may be default (`A default policy already exists: <name>.`). The REST API does **not** auto-assign it — filter `GET .../policies/?is_default=true` and pass the `id` |
+| `require_independent_review` *(1.1.0+)* | bool (default False) | Exclude the CR owner's own reviews from every rule in this policy. Per-policy, so a low-risk policy can allow self-review while a critical one forbids it |
+| `rule_count` | int, read-only | Number of rules |
 
 ## PolicyRule Fields
 
@@ -21,7 +32,7 @@ For the CR to reach `approved`, ALL enabled rules in the policy must pass.
 | `name` | string | Rule name |
 | `description` | string | Optional description |
 | `enabled` | bool (default True) | Disabled rules are skipped |
-| `min_reviews` | int (1–10) | Minimum approved non-stale reviews required |
+| `min_reviews` | int (0–10) | Minimum approved non-stale reviews required. `0` = rule always passes (allowed, not recommended) |
 | `reviewers` | M2M → User | Specific eligible reviewers |
 | `reviewer_groups` | M2M → Group | Eligible reviewer groups |
 
@@ -37,7 +48,9 @@ A Policy with zero enabled rules **can never be satisfied**. This means:
 - Branches with these CRs can never merge (merge gating)
 - Disabling all rules has the same effect
 
-Similarly, a rule with **zero reviewers** (empty `reviewers` and `reviewer_groups`) effectively always fails — no user's review can count toward `min_reviews`.
+Similarly, a rule with **zero reviewers** (empty `reviewers` and `reviewer_groups`) effectively always fails — no user's review can count toward `min_reviews` (unless `min_reviews` is `0`). The UI flags rules whose eligible reviewer count is below `min_reviews` as unsatisfiable.
+
+*(1.1.0+)* Under `require_independent_review`, the CR owner is removed from the eligible set for their own CR — a rule whose only eligible reviewer is the owner is unsatisfiable for that CR. Give each rule at least two eligible reviewers when using independent review.
 
 **Always ensure at least one enabled PolicyRule exists with at least one eligible reviewer.**
 
@@ -49,9 +62,13 @@ Similarly, a rule with **zero reviewers** (empty `reviewers` and `reviewer_group
 POST /api/plugins/changes/policies/
 {
     "name": "Standard Review",
-    "description": "Requires approval from network team"
+    "description": "Requires approval from network team",
+    "is_default": true,
+    "require_independent_review": true
 }
 ```
+
+(`is_default` / `require_independent_review` are 1.1.0+; omit on 1.0.x.)
 
 ### 2. Add a Rule
 

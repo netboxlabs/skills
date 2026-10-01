@@ -37,7 +37,7 @@ license: Apache-2.0
 
 | Source | URL / Method | Use for |
 |--------|-------------|---------|
-| NDX feature docs | `https://netboxlabs.com/docs/cloud/features/ndx/` | Feature reference, import/sync, tiers |
+| NDX feature docs | `https://netboxlabs.com/docs/ndx/` | Feature reference, import/sync, tiers |
 | NDX public catalog | `https://netboxlabs.com/ndx` | Browse/search the catalog; YAML download (enrichment values gated) |
 | NetBox DCIM models | `https://netboxlabs.com/docs/netbox/models/dcim/` | DeviceType/ModuleType/RackType structure |
 | Community DTL | `https://github.com/netbox-community/devicetype-library` | The open-source DTL NDX includes (Apache-2.0) |
@@ -46,7 +46,7 @@ license: Apache-2.0
 ## FIRST: Verify the Feature Is Available
 
 ```bash
-curl -s -H "Authorization: Token $NETBOX_TOKEN" \
+curl -s -H "Authorization: Bearer $NETBOX_TOKEN" \
   "$NETBOX_URL/api/plugins/ndx/import-records/?limit=1" | python -m json.tool
 ```
 
@@ -146,12 +146,33 @@ The heart of the feature. Each device/module/rack type can have one enrichment r
 4. **Always surface provenance + confidence.** Every non-null value has a `provenance_entries[]` entry (`source` URL, `provenance_type`, `confidence` from `high`…`unverified`). Treat `low`/`unverified` cautiously.
 5. **Deep protocol data is in `extensions_data`**, not top-level columns. Only sysObjectID, OID prefix, and NOS are promoted.
 
+### NDX lifecycle vs. core `end_of_life` (NetBox 4.7+)
+
+NetBox 4.7 added a single optional `end_of_life` date to `DeviceType` and `ModuleType` ("the date after which this device type is no longer supported by the manufacturer"), plus `cooling_method` (`air`/`liquid`/`hybrid`/`immersion`). The two layers are complementary, not duplicates:
+
+| | Core `end_of_life` *(4.7)* | NDX lifecycle enrichment |
+|---|---|---|
+| Shape | One `YYYY-MM-DD` date, no source | Six dates (`ga_date`, `eol_announced`, `eos_date`, `eosw_date`, `eosec_date`, `last_support_date`), `YYYY-MM` or `YYYY-MM-DD` |
+| Provenance | None — user-maintained | `provenance_entries[]` with source URL + confidence |
+| Reach | Core filters, tables, exports, any plugin, any NetBox version 4.7+ | `/api/plugins/ndx/` on Cloud/Enterprise, values on paid plans |
+
+**NDX populates core `end_of_life` for you (NDX plugin 0.7.0+, 2026-09-19, on NetBox 4.7+).** On import and re-import, NDX writes `DeviceType`/`ModuleType.end_of_life` from the enrichment's **`last_support_date`** (the semantic match for "no longer supported by the manufacturer"), never from `eos_date` (end of sale) or `eol_announced`. Rules an agent must know:
+
+- Controlled by the plugin setting `populate_core_end_of_life` (default **on**); off leaves lifecycle data in the enrichment record only.
+- Only a strict `YYYY-MM-DD` value is written. A partial `YYYY-MM` `last_support_date` is **skipped** (logged, field left unchanged) — a guessed date is treated as worse than none.
+- Local edits win: the core field is written only when it is empty or still equals the value NDX last wrote. A date a user changed is left alone on re-import.
+- `cooling_method` is **not** populated. NDX thermal `cooling_type` (`air`/`liquid`/`mixed`/`passive`) stays in the enrichment record.
+
+So on 4.7+ with a current NDX plugin, treat core `end_of_life` as NDX-maintained and do not overwrite it by hand. Write it yourself only when the setting is off, the type was imported before plugin 0.7.0 and not re-synced, or the NDX date is partial and the user accepts an expanded date:
+
+A hand-set `end_of_life` that differs from the last NDX-written value is preserved on re-import. If you copy NDX `cooling_type` into core `cooling_method`, map `mixed` → `hybrid` and leave `passive` unset (no core equivalent) — NDX does not do this for you.
+
 ## Common Workflows
 
 Full sequences in [references/consume-workflows.md](references/consume-workflows.md). The high-value ones:
 
 - **Look up a known type's enrichment:** `GET import-records/?q=<model>` → read the nested `enrichment` (no second call needed) → read `eos_date`, `max_power_draw_watts`, `extensions_data.gnmi.default_port`, etc.
-- **EOL/EOS exposure report:** pull deployed devices from `GET /api/dcim/devices/`, collect their `device_type` ids, match each to its NDX import record, flag types past/near `eos_date`/`last_support_date`, present with provenance.
+- **EOL/EOS exposure report:** pull deployed devices from `GET /api/dcim/devices/`, collect their `device_type` ids, match each to its NDX import record, flag types past/near `eos_date`/`last_support_date`, present with provenance. *(4.7)* Also read core `DeviceType.end_of_life` and reconcile the two (see above).
 - **Populate observability config:** read `snmp_sys_object_id`, `extensions_data.snmp.mibs[]`, or `extensions_data.gnmi`/`.netconf`/`.redfish` to drive *what* to poll (NDX gives the what/how, not the config).
 - **Import a catalog entry:** `POST import/` with the `ndx_id`(s).
 
@@ -176,6 +197,14 @@ So a `has_lifecycle: true` with empty lifecycle fields is a tier-gating signal, 
 9. **Expecting deep protocol data as columns.** It's inside `extensions_data` keyed by protocol.
 10. **Expecting `sync/` to update data.** Sync only flags updates; applying requires re-import.
 11. **Treating NDX as instance/monitoring data.** It is device-**type** reference metadata only.
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- Core `end_of_life` (date) and `cooling_method` on `DeviceType`/`ModuleType`; `cooling_capability`/`cooling_capacity` on Rack/RackType; full cooling models (sources, feeds, intakes, outflows). NDX enrichment stays the sourced, multi-date lifecycle and thermal record; NDX plugin 0.7.0+ writes core `end_of_life` from `last_support_date` on import (setting `populate_core_end_of_life`, default on; strict dates only; local edits preserved) and does not write `cooling_method`. NDX plugin 0.7.1 declares NetBox 4.5–4.7 compatibility.
+- `GET /api/dcim/devices/` always includes `config_context` on 4.7 (`?exclude=config_context` is ignored) — keep `?fields=id,name,device_type` on the exposure-report pull.
+- Selection custom fields read as `{"value", "label"}` — matters only if you store NDX-derived values in custom fields on 4.5–4.6 instances and compare them.
 
 ## References
 

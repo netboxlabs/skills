@@ -41,6 +41,8 @@ for chunk in create_message_chunks(entities, max_chunk_size_mb=2.0):
 ```go
 // Automatic chunking via option
 resp, err := client.Ingest(ctx, entities, diode.WithChunking(0))  // 0 = default 3MB
+// By default only the last chunk's IngestResponse is returned; add
+// diode.WithChunkingReturnAllResults() to aggregate errors from every chunk.
 
 // Manual chunking for more control
 chunks := diode.CreateMessageChunks(protoEntities, 3.5)

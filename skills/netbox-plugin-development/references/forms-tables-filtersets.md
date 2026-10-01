@@ -107,14 +107,47 @@ class AccessListFilterForm(NetBoxModelFilterSetForm):
     tag = TagFilterField(AccessList)
 ```
 
+## Generic Object Fields (4.7+)
+
+`GenericObjectChoiceField` renders a generic foreign key (content type + object) as one
+API-backed field; `GenericObjectFormMixin` seeds it from the instance and writes the cleaned
+object back to the GFK descriptor in `clean()`. Requires `min_version = '4.7.0'`.
+
+```python
+from django.contrib.contenttypes.models import ContentType
+from netbox.forms import NetBoxModelForm
+from utilities.forms.fields import GenericObjectChoiceField
+from utilities.forms.mixins import GenericObjectFormMixin
+from utilities.forms.rendering import FieldSet
+
+class AttachmentForm(GenericObjectFormMixin, NetBoxModelForm):
+    assigned_object = GenericObjectChoiceField(          # name of the model's GFK descriptor
+        content_type_queryset=ContentType.objects.filter(app_label='dcim', model__in=['device', 'rack']),
+        label='Assigned object',
+        # gfk_name='...' if the form field name differs from the descriptor; selector=True for the modal
+    )
+    fieldsets = (FieldSet('name', 'assigned_object', 'tags', name='Attachment'),)
+
+    class Meta:
+        model = Attachment
+        fields = ('name', 'tags')      # the GFK is assigned by the mixin, not by ModelForm
+```
+
+## Static Choice Descriptions (4.7+)
+
+`utilities.forms.fields.ChoiceField` / `MultipleChoiceField` render a description under each option
+when the `ChoiceSet` uses `Choice(value, label, color=None, description=None)` (see
+[model-patterns](model-patterns.md#choices-pattern)); pass `show_descriptions=False` to suppress.
+
 ## Tables — NetBoxTable
 
 ```python
+import django_tables2 as tables
 from netbox.tables import NetBoxTable, columns
 
 class AccessListTable(NetBoxTable):
-    name = columns.LinkColumn()           # clickable link to detail view
-    device = columns.LinkColumn()         # clickable FK
+    name = tables.Column(linkify=True)    # clickable link to detail view (no LinkColumn in netbox.tables.columns)
+    device = tables.Column(linkify=True)  # clickable FK
     type = columns.ChoiceFieldColumn()    # colored badge for choices
     tags = columns.TagColumn()
     actions = columns.ActionsColumn()     # edit/delete buttons
@@ -125,9 +158,14 @@ class AccessListTable(NetBoxTable):
         default_columns = ('name', 'device', 'type')
 ```
 
-**Available columns:** `LinkColumn`, `ChoiceFieldColumn`, `TagColumn`,
-`BooleanColumn`, `ColorColumn`, `TemplateColumn`, `ActionsColumn`,
-`ArrayColumn` (4.4+).
+**Available columns** (`netbox.tables.columns`): `ChoiceFieldColumn`, `TagColumn`,
+`BooleanColumn`, `ColorColumn`, `TemplateColumn`, `ActionsColumn`, `ArrayColumn` (4.4+),
+`MPTTColumn` for hierarchies (on 4.7 an alias of `TreeColumn`; alias removed in 5.0).
+Links are `tables.Column(linkify=True)` — there is no `LinkColumn`.
+
+> **NetBox 4.7+** ships django-tables2 v3: in custom table templates `{% querystring %}` (from
+> `{% load django_tables2 %}`) is now `{% querystring_replace %}`, and `RelatedLinkColumn` is
+> removed (use `tables.Column(linkify=True)`).
 
 ## FilterSets — NetBoxModelFilterSet
 

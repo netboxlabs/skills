@@ -2,19 +2,25 @@
 
 Detailed reference for NetBox API performance tuning.
 
-## Critical: Exclude Config Context
+## Critical: Config Context on Device/VM Lists
 
-**The single most impactful optimization for device/VM queries.**
+**The single most impactful optimization on NetBox 4.5–4.6 — and a no-op on 4.7+.**
+
+| Version | Behavior | Do this |
+|---------|----------|---------|
+| 4.5–4.6 | Rendered per object on every request: hierarchy walk, rule evaluation at each level, merge, JSON serialization | `?exclude=config_context` on every device/VM list (or `?omit=config_context`, 4.5.2+) |
+| 4.7+ | Pre-rendered and cached on the object, invalidated and re-rendered by a background job; always included; `?exclude=config_context` **silently ignored** | Nothing for speed. Use `?fields=`, `?brief=True`, or `?omit=config_context` to cut payload size |
 
 ```python
-# SLOW: 10-100x slower
+# 4.5–4.6: 10-100x slower without the exclude
 requests.get(f"{API_URL}/dcim/devices/", headers=headers)
-
-# FAST
 requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)
+
+# 4.5.2 through 4.7: one form that skips rendering on 4.5/4.6 and trims the payload on 4.7
+requests.get(f"{API_URL}/dcim/devices/?omit=config_context", headers=headers)
 ```
 
-Config context computation involves traversing the device hierarchy, evaluating context rules at each level, merging multiple sources, and serializing potentially large JSON.
+Measured on 4.5–4.6:
 
 | Devices | With config_context | Without |
 |---------|-------------------|---------|
@@ -22,9 +28,9 @@ Config context computation involves traversing the device hierarchy, evaluating 
 | 1,000 | 20-60s | 0.5-1s |
 | 5,000 | Timeout likely | 2-5s |
 
-Also applies to virtual machines: `?exclude=config_context`.
+Also applies to virtual machines.
 
-**When config context IS needed:** Fetch individual objects (`/dcim/devices/123/`) or specific small batches.
+**When config context IS needed:** on 4.5–4.6 fetch individual objects (`/dcim/devices/123/`) or small batches; on 4.7+ read it straight from the list response. In the brief window after a config context changes, 4.7 falls back to on-demand rendering for the affected objects, so the data is correct rather than stale.
 
 ## Brief Mode
 
@@ -40,12 +46,13 @@ Brief returns: `id`, `url`, `display`, and natural key fields.
 
 ## Maximum Optimization
 
-Combine all parameters for maximum performance:
+Combine parameters for maximum performance. Brief mode already drops `config_context` on every version, so `?brief=True` alone covers it:
 
 ```python
-requests.get(
-    f"{API_URL}/dcim/devices/?exclude=config_context&brief=True&limit=100",
-    headers=headers)
+requests.get(f"{API_URL}/dcim/devices/?brief=True&limit=100", headers=headers)
+
+# Need more than brief fields? ?fields= returns only what you list, so config_context stays out
+requests.get(f"{API_URL}/dcim/devices/?fields=id,name,status,site.name&limit=100", headers=headers)
 ```
 
 ## Parallel Requests
@@ -58,7 +65,7 @@ import asyncio, httpx
 async def fetch_inventory():
     async with httpx.AsyncClient(headers=headers, timeout=30) as client:
         tasks = [
-            client.get(f"{API_URL}/dcim/devices/?limit=100&exclude=config_context"),
+            client.get(f"{API_URL}/dcim/devices/?limit=100&omit=config_context"),
             client.get(f"{API_URL}/dcim/sites/?limit=100&brief=True"),
             client.get(f"{API_URL}/ipam/prefixes/?limit=100"),
             client.get(f"{API_URL}/ipam/ip-addresses/?limit=100"),
@@ -124,8 +131,10 @@ The generic search filter becomes extremely slow with large datasets, especially
 
 ## Version Performance Notes
 
-- **v4.0.0**: Some performance regressions
+- **v4.7.0**: config context pre-rendered and cached — device/VM lists no longer pay the render cost; hierarchies moved to PostgreSQL `ltree` and denormalized fields to triggers; global search index updates deferred to a background job (UI search may lag a write briefly)
+- **v4.6.x**: cursor pagination for REST (`?start=`); N+1 fixes in GraphQL for tags, cable terminations, generic relations; faster bulk deletes (4.6.7)
 - **v4.4.9+**: Includes fixes for several performance issues
+- **v4.0.0**: Some performance regressions
 - Always test performance before upgrading with production-like data
 
 ## Troubleshooting
@@ -142,9 +151,9 @@ def timed_request(session, url):
     print(f"URL: {url}, Status: {response.status_code}, Time: {elapsed:.2f}s, Size: {len(response.content)}B")
     return response
 
-# Compare with and without config_context
+# Compare with and without config_context — a large gap on 4.5–4.6; on 4.7+ only the payload size differs
 timed_request(session, f"{API_URL}/dcim/devices/?limit=100")
-timed_request(session, f"{API_URL}/dcim/devices/?limit=100&exclude=config_context")
+timed_request(session, f"{API_URL}/dcim/devices/?limit=100&omit=config_context")
 ```
 
 ### Request Correlation
@@ -171,7 +180,7 @@ def debug_graphql(netbox_url, token, query):
 
 ### Common Issues Checklist
 
-1. **Slow device lists?** → Add `?exclude=config_context`
+1. **Slow device lists?** → On 4.5–4.6 add `?exclude=config_context`. On 4.7+ it is ignored (context is cached) — look at page size, `?q=`, and missing filters instead
 2. **Large payloads?** → Use `?brief=True` or `?fields=`
 3. **Slow search?** → Replace `?q=` with specific filters
 4. **GraphQL timeout?** → Check pagination, depth, fan-out

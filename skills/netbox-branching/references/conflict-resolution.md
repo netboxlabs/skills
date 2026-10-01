@@ -53,24 +53,29 @@ POST /api/plugins/branching/branches/7/merge/
 Response (409):
 ```json
 {
-  "detail": "All conflicts must be acknowledged before this branch can be merged.",
+  "detail": "All conflicts must be acknowledged before this action can proceed.",
   "conflicts": [
     {
       "id": 1,
       "object_type": "dcim.device",
       "object_id": 42,
       "object_repr": "switch-01",
-      "action": "update",
+      "action": {"value": "update", "label": "Updated"},
       "conflicts": ["name", "status"],
       "conflicting_data": {
         "original": {"name": "switch-01", "status": "active"},
         "branch": {"name": "switch-london-01", "status": "planned"},
         "main": {"name": "switch-nyc-01", "status": "staged"}
-      }
+      },
+      "last_updated": "2025-01-15T10:07:10Z"
     }
   ]
 }
 ```
+
+`conflicting_data` contains only the conflicting fields. Fetch the full three-way diff with `GET /api/plugins/branching/changes/<id>/`.
+
+Objects **deleted in main** while modified in the branch are also tracked as conflicts (0.9.0+), and conflicts are recorded reliably on every branch-side update as of 1.1.3 — on older 1.x builds some update conflicts went unflagged, so re-check after upgrading.
 
 ## Resolving Conflicts
 
@@ -114,5 +119,7 @@ Validates the merge/sync without applying. Returns conflicts in the 409 response
 1. **Sync frequently** to minimize conflict surface area.
 2. **Dry-run before merge** to discover conflicts early.
 3. **Review the 409 `conflicts` array** carefully — understand what branch vs main changed before acknowledging.
-4. **Use squash merge** for complex branches — it handles CREATE+DELETE optimization and dependency ordering, reducing merge failures.
-5. **Coordinate with Change Request workflow** — review conflicts as part of CR approval.
+4. **Fall back to squash merge** when iterative fails (duplicate objects created in both main and branch, intermediate-state constraint errors) — it applies only each object's final state with FK-dependency ordering. Squash is UI-only (no REST strategy parameter) and attributes main's changelog entries to the merging user.
+5. **Resolve at sync time, not merge time** — conflicts acknowledged during a sync are preserved through the later merge (1.0.4+), so a sync-then-merge sequence needs the acknowledgment once.
+6. **Coordinate with Change Request workflow** — review conflicts as part of CR approval.
+7. **Programmatic edits need `obj.snapshot()`** before mutation, or conflict detection silently no-ops for that object (empty `prechange_data`).
