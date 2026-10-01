@@ -150,9 +150,55 @@ class AccessListViewTest(ViewTestCases.PrimaryObjectViewTestCase):
 `ViewTestCases.PrimaryObjectViewTestCase` automatically tests list, detail, create,
 edit, delete, and bulk operations. Provide `form_data` and `bulk_edit_data`.
 
+## FilterSet Tests
+
+The mixin checks that every model field has a filter and exercises the standard lookups.
+NetBox 4.7 renamed it (`ChangeLoggedFilterSetTests` → `ChangeLoggedFilterSetTestMixin`,
+`BaseFilterSetTests` → `BaseFilterSetTestMixin`); import version-safely when spanning 4.5–4.7:
+
+```python
+from django.test import TestCase
+try:
+    from utilities.testing import ChangeLoggedFilterSetTestMixin                 # 4.7+
+except ImportError:
+    from utilities.testing import ChangeLoggedFilterSetTests as ChangeLoggedFilterSetTestMixin  # 4.5/4.6
+from .filtersets import AccessListFilterSet
+from .models import AccessList
+
+class AccessListFilterSetTest(TestCase, ChangeLoggedFilterSetTestMixin):
+    queryset = AccessList.objects.all()
+    filterset = AccessListFilterSet
+
+    @classmethod
+    def setUpTestData(cls):
+        ...   # create ≥3 objects with distinct field values
+
+    def test_type(self):
+        params = {'type': ['standard']}
+        self.assertEqual(self.filterset(params, self.queryset).qs.count(), 2)
+```
+
+## Search Index Assertions (4.7+)
+
+Global search cache updates are deferred to after the transaction commits. Django `TestCase`
+never runs on-commit callbacks on its own, so a test that saves an object and then asserts it
+appears in `search_backend.search(...)` must execute them explicitly:
+
+```python
+from netbox.search.backends import search_backend
+
+def test_searchable(self):
+    with self.captureOnCommitCallbacks(execute=True):
+        AccessList.objects.create(name='edge-acl', device=self.device, type='standard')
+    self.assertTrue(any(r.object.name == 'edge-acl' for r in search_backend.search('edge-acl')))
+```
+
+(With no RQ worker listening — the usual case under `manage.py test` — the flush indexes inline.)
+
 ## Tips
 
 - `APITestCase` provides `self.header` with a pre-authenticated admin token
 - `setUpTestData` (classmethod) is faster than `setUp` — shared across tests in class
 - Always create enough objects (≥3) for bulk operation tests
 - Test permission enforcement: use `ObjectPermission` to verify restricted access
+- NetBox 4.7 requires PostgreSQL 15+ — the system check fails under `manage.py test` on 14

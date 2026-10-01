@@ -22,6 +22,10 @@ Common source systems and how their fields map to NetBox models.
 | tenant, customer, owner | Tenant.name | Map to tenant model |
 | status, state | *.status | Map to: active/planned/staged/offline/decommissioning/inventory |
 | description, notes | .description or .comments | comments supports markdown |
+| eol, end_of_support, eos_date | DeviceType.end_of_life / ModuleType.end_of_life *(4.7)* | Single `YYYY-MM-DD` date per hardware model ("no longer supported by the manufacturer"). On 4.5–4.6 use a custom field. Multi-date, sourced lifecycle data: [netbox-ndx](../../netbox-ndx/SKILL.md) |
+| cooling, cooling_type | DeviceType.cooling_method / Device.cooling_method *(4.7)* | Map to `air`/`liquid`/`hybrid`/`immersion`; Device inherits from DeviceType on create. 4.5–4.6: custom field |
+| slot_type, bay_type, cage | ModuleBayType *(4.7)* | Name + slug (optional manufacturer); assign to ModuleType.module_bay_types and module bay templates |
+| service, listening_port, protocol | Service.port_mappings *(4.7)* | `["tcp/443", "udp/53"]`; on 4.5–4.6 `protocol` + `ports` (one protocol per service) |
 
 ## Source-Specific Guidance
 
@@ -72,7 +76,7 @@ Key problems:
 
 No direct migration tool. Export via Device42 API → transform → import via pynetbox or Diode.
 
-Key mapping: Device42's "device" model is richer than NetBox's — some fields go to custom fields.
+Key mapping: Device42's "device" model is richer than NetBox's — some fields go to custom fields. Hardware-model end-of-life/end-of-support dates map to `DeviceType.end_of_life` on NetBox 4.7+ (custom field on 4.5–4.6).
 
 ### ServiceNow CMDB
 **Data available:** CIs, relationships, locations, services.

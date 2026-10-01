@@ -19,7 +19,7 @@
 | BGP Attribute Verification | `bgp-attributes` | 3 | Config | BGP local-pref, MED, route advertisement |
 | Full Resilience Audit | `full-resilience-audit` | 15 | Graph + Config | All graph checks — power, topology, and routing |
 
-## Compliance Framework Packs (8)
+## Compliance Framework Packs (9)
 
 *Premium tier.*
 
@@ -102,7 +102,7 @@ curl -X PATCH "$NETBOX_URL/api/plugins/validation/policies/5/" \
 
 ### Add or Remove Rules
 
-Delete rules you don't need, add new ones with different checks or parameters.
+Delete rules you don't need, add new ones with different checks or parameters. Deleting a rule (or a whole policy) preserves historical run results — prior runs keep the rule's name and outcome, shown as "(deleted rule)" (plugin 1.13+).
 
 ## Framework Details
 

@@ -145,11 +145,13 @@ Use NetBox's official Docker image in CI/CD for integration testing:
 # GitHub Actions example
 services:
   netbox:
-    image: netboxcommunity/netbox:v4.6-3.4.0   # pin to the NetBox version you test against; ':latest' silently drifts (e.g. into 4.6/Django 6.0)
+    image: netboxcommunity/netbox:v4.7-5.1.1   # tag = v<netbox>-<netbox-docker>; pin to the NetBox minor you test against (v4.7.2-5.1.1 pins a patch). ':latest' silently drifts. netbox-docker 5.x requires NetBox 4.7+; use a 4.x netbox-docker tag for 4.5/4.6
     ports:
       - 8000:8080
     env:
       SUPERUSER_API_TOKEN: "0123456789abcdef0123456789abcdef01234567"
 ```
 
-Seed test data via Ansible modules or direct API calls at the start of each pipeline run.
+Seed test data via Ansible modules or direct API calls at the start of each pipeline run. For large seeds on **4.7+**, bulk REST writes accept `?background=true` (HTTP 202 + job URL; poll the job before running tests) — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+
+> **NetBox 4.7+**: `config_context` is pre-rendered and always present in device/VM REST output (`?exclude=config_context` is ignored), so export-to-Git pipelines that pull device data get context data for free. On 4.5/4.6 request it explicitly (or drop `exclude`) when the pipeline needs it.

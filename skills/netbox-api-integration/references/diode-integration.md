@@ -27,7 +27,7 @@ Diode is a data ingestion service from NetBox Labs that:
 - NetBox 4.2.3+
 - Diode Server deployed
 - Diode NetBox Plugin installed
-- `pip install netboxlabs-diode-sdk`
+- `pip install netboxlabs-diode-sdk` — current **1.14.1**; 1.14.0 regenerated the ingester for NetBox 4.7, 1.13 added auth backoff on 429/5xx. Details in [netbox-diode](../../netbox-diode/SKILL.md)
 
 ## Basic Usage
 

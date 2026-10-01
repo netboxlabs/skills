@@ -92,6 +92,25 @@ All actions (Apply, Ignore, Rediff) support bulk execution from list views. Sele
 - Use filters to narrow to a specific object type or source before bulk applying
 - Review a sample of deviations before bulk-applying a large batch
 
+## NetBox 4.7 API Changes That Affect Remediation
+
+Apply writes through NetBox itself, so what you see in the Changes tab and anything you script around deviations follows the NetBox REST API of the bundled version. On NetBox 4.7 (verified in 4.7.2):
+
+| Area | 4.7 behaviour | 4.5 / 4.6 behaviour |
+|------|---------------|---------------------|
+| Selection / multi-selection custom fields | REST and GraphQL return `{"value": "datacenter", "label": "Data Center"}` (a list of them for multi-select). Writes still accept the raw value — compare and send `value`, not `label`. | Raw value returned |
+| Service / ServiceTemplate ports | `port_mappings` (`["tcp/53", "udp/53"]`) is the canonical field; `protocol` + `ports` are deprecated, populated only for single-protocol services (`null` otherwise), removed in 5.0. Don't send both in conflict. | `protocol` + `ports` only |
+| Interface MAC | `mac_address` is writable and creates/updates the primary MAC in one call; `MACAddress.is_primary` is read-only | `mac_address` read-only; assign via `primary_mac_address` |
+| Bulk create/update failures | `{"detail": ..., "errors": [{"index": N, "errors": {...}}]}` — per-object, still all-or-none | First failure only |
+| Device / VM reads | `config_context` always included; `?exclude=config_context` silently ignored | `?exclude=config_context` honoured |
+
+If you follow up an Apply with your own `requests`/`pynetbox` calls, branch on the NetBox version when parsing custom-field values or service ports:
+
+```python
+cf = device["custom_fields"]["environment"]
+value = cf["value"] if isinstance(cf, dict) else cf   # 4.7 returns {value,label}; 4.5/4.6 return the raw value
+```
+
 ## Resolution Patterns
 
 ### Clean Sweep (Day 1)

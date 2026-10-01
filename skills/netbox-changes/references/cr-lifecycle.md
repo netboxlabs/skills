@@ -49,8 +49,10 @@ When policy is NOT met, valid choices are restricted to:
 > policy (in 0.4.x it was auto-only, reachable solely when a reviewer submitted a
 > "changes-requested" review). A reviewer's "changes-requested" review still moves
 > the CR to that status automatically. A `rejected` CR is also no longer terminal —
-> it can be reopened by setting it back to `draft`/`needs-review`, or replaced by a
-> new CR on the same branch.
+> it can be reopened by setting it back to `draft`/`needs-review`/`changes-requested`
+> (only if the branch has no other *active* CR), or replaced by a new CR on the same
+> branch. A review with status `rejected` is feedback only — it does not reject the CR;
+> rejecting is always a manual CR status change.
 
 ## State Diagram
 
@@ -91,3 +93,4 @@ Policy compliance is automatically re-evaluated when:
 - **Approval invalidation**: Any new change in a branch after approval reverts the CR to `needs-review`. This ensures reviewers see the latest state.
 - **Policy rule changes**: If a policy rule is tightened after approval (e.g., `min_reviews` increased), the CR reverts to `needs-review` if the policy is no longer met.
 - **Cascading from reviews**: A single `changes-requested` review immediately sets the CR status, regardless of other approvals.
+- **Owner reviews** *(1.1.0+)*: under a policy with `require_independent_review`, the owner's own `approved` review is recorded but never moves the CR to `approved`. Their `changes-requested` review still moves the CR to `changes-requested` (that transition ignores eligibility).

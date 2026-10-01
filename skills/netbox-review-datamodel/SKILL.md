@@ -45,6 +45,8 @@ Follow this checklist when auditing a NetBox data model:
 | HIER-4 | Racks should have a Location when the site has locations defined | Medium |
 | HIER-5 | Don't create single-child hierarchies — they add complexity without value | Low |
 | HIER-6 | On 4.6+, **RackGroups** offer a flat, cross-location way to group racks (e.g. "cage-7", "cold-aisle-B") independent of the Location tree — use them when rack grouping doesn't map cleanly onto site/location nesting, not as a substitute for Locations | Low |
+| HIER-7 | On 4.7+, hierarchies are ltree-backed: flag scripts/saved filters/exports that filter or order by `level` (no longer a DB column) — use `parent_id`/`ancestor_id` or `get_ancestors()` instead. Modeling advice is unchanged | Medium |
+| HIER-8 | On 4.7+, if the instance was restored from a **4.7.0** `pg_dump`, descendant paths may be stale after renames/moves — have the admin run `manage.py rebuild_ltree_paths --check` and repair before trusting hierarchy reports | Medium |
 
 ### IPAM (IPAM)
 
@@ -56,6 +58,7 @@ Follow this checklist when auditing a NetBox data model:
 | IPAM-4 | IP Addresses must have prefix length (`/32` for loopbacks, actual mask for interfaces) | High |
 | IPAM-5 | Use Roles to classify prefix purpose (infrastructure, customer, management); on NetBox 4.6+ **ASNs can also carry a Role** — use it to classify ASN purpose | Medium |
 | IPAM-6 | VLANs should be in VLAN Groups with an appropriate **scope**. Scope can be Region/SiteGroup/Site/Location/Rack/ClusterGroup/Cluster (and **RackGroup** on 4.6+) — don't assume site/location are the only options; pick the tightest scope that matches the VLANs' reuse boundary | Medium |
+| IPAM-7 | On 4.7+, a service that listens on one port over several protocols (DNS `tcp/53` + `udp/53`) is **one** Service with multiple `port_mappings` — flag duplicate per-protocol services (`dns-tcp`, `dns-udp`) and merge them; flag integrations still writing the deprecated `protocol`/`ports` pair (removed 5.0). On 4.5–4.6 one-service-per-protocol is the only option | Low |
 
 ### Device Modeling (DEV)
 
@@ -66,6 +69,10 @@ Follow this checklist when auditing a NetBox data model:
 | DEV-3 | Platforms indicate software — assign them for config template compatibility | Medium |
 | DEV-4 | Virtual chassis members should have proper VC position and master assignment | Medium |
 | DEV-5 | Interface types must match reality (1000base-t vs 10gbase-sr) for capacity planning | Medium |
+| DEV-6 | Every Rack should have a **Rack Type** with dimensions defined there. On 4.7 the per-rack `form_factor`, `width`, and `outer_*` fields are deprecated; in 5.0 they are removed and `rack_type` becomes mandatory — flag racks whose `rack_type` is `null` (walk `GET /api/dcim/racks/?brief=1` — there is no null filter on `rack_type_id`) and per-rack dimensions that differ from their type | High |
+| DEV-7 | On 4.7+, model breakout/channelized ports with `channels` on the parent and `channel_id` subinterfaces (`channel` type), not as loose virtual interfaces or extra physical interfaces — otherwise cable paths and port counts are wrong | Medium |
+| DEV-8 | On 4.7+, use **Module Bay Types** where a chassis restricts which modules fit which slots (line-card vs supervisor vs fan bays) — an empty bay-type set means "anything fits", so absence is fine for simple hardware but flag chassis with mixed slot types and no bay types | Low |
+| DEV-9 | On 4.7+, record hardware lifecycle with `end_of_life` on Device Types/Module Types and cooling with `cooling_method` (Device/DeviceType) and `cooling_capability`/`cooling_capacity` (Rack/RackType) — flag custom fields (`cf_eol`, `cf_cooling`) duplicating these. Liquid-cooled halls should use CoolingSource → CoolingFeed → intake/outflow components, mirroring PowerPanel → PowerFeed | Medium |
 
 ### Extensibility (EXT)
 
@@ -76,9 +83,10 @@ Follow this checklist when auditing a NetBox data model:
 | EXT-3 | Use **config contexts** for hierarchical key-value data that merges by scope | — |
 | EXT-4 | Use **custom objects** when you need a new first-class entity with its own relationships | — |
 | EXT-5 | Never store structured data (JSON, lists) in description or comments fields | High |
-| EXT-6 | Don't create custom fields that duplicate built-in fields (e.g., custom "location" field) | High |
+| EXT-6 | Don't create custom fields that duplicate built-in fields (e.g., custom "location" field; on 4.7+ also `end_of_life`, `cooling_method`, rack cooling capacity) | High |
 | EXT-7 | Prefer custom objects over dozens of custom fields when the data is really a related entity | Medium |
 | EXT-8 | On 4.6+, attach a **`validation_schema`** (JSON Schema) to JSON custom fields to enforce structure instead of leaving them free-form; flag JSON fields holding structured data with no schema | Medium |
+| EXT-9 | On 4.7+, selection/multi-selection custom field values are returned as `{value, label}` objects — flag REST/GraphQL consumers (integrations, scripts calling the API) that compare `custom_fields.x` to a bare string (ORM access via `obj.cf[...]` still returns the raw value); and URL custom fields must use a scheme in `ALLOWED_URL_SCHEMES` — flag values with `javascript:`/custom schemes that will now fail validation | Medium |
 
 ### Naming (NAME)
 
@@ -108,6 +116,9 @@ Follow this checklist when auditing a NetBox data model:
 | JSON blobs in description fields | Not searchable, not validated, not filterable | Use custom fields or config contexts |
 | One giant "catch-all" custom field per type | Defeats the purpose of structured data | Split into individual fields |
 | Devices without Device Types | Loses port/bay/slot modeling | Always specify hardware model |
+| Racks without Rack Types | Per-rack dimensions deprecated (4.7), removed and `rack_type` mandatory in 5.0 | Create one RackType per physical model, assign to racks, drop per-rack dims |
+| One service per protocol for the same port (4.7+) | Duplicates; `protocol`/`ports` deprecated | Merge into one Service with `port_mappings` |
+| Breakout ports as extra physical interfaces (4.7+) | Wrong cable paths and port counts | Parent `channels` + `channel_id` subinterfaces |
 | Mixing naming conventions | Impossible to script against, confusing | Standardize and bulk-rename |
 | Tags with spaces or special characters | Breaks API filtering, scripts | Use slug-friendly tag names |
 | Over-nested regions (> 3 levels) | Adds complexity without improving navigation | Flatten to 2-3 levels max |

@@ -78,6 +78,8 @@ Features:
 
 Uses `python-social-auth`. All `SOCIAL_AUTH_*` settings go in `configuration.py`.
 
+> **NetBox 4.7**: ships `social-auth-app-django` 6.0 and `social-auth-core` 5.1 — both major releases. Test every SSO backend against a non-production 4.7 instance before upgrading, and keep a local-credential admin available. 4.7.1 also switched SSO login initiation to script-driven navigation so a restrictive CSP `form-action` no longer blocks it.
+
 ### OIDC Example (Keycloak)
 
 ```python

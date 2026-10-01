@@ -15,6 +15,8 @@ Dates are **strings**, format `YYYY-MM` or `YYYY-MM-DD`.
 | `eosec_date` | End of security/vulnerability support |
 | `last_support_date` | Last date of support/warranty |
 
+*(NetBox 4.7+)* Core `DeviceType.end_of_life` / `ModuleType.end_of_life` is a single user-maintained `YYYY-MM-DD` date with no provenance; NDX does not document writing it. Closest NDX source: `last_support_date` (then `eos_date`). Expand `YYYY-MM` values before PATCHing.
+
 ## Thermal (`has_thermal`)
 
 | Field | Unit | Notes |
@@ -22,6 +24,8 @@ Dates are **strings**, format `YYYY-MM` or `YYYY-MM-DD`.
 | `tdp_watts` | watts | total system thermal design power |
 | `airflow_cfm` | CFM | |
 | `cooling_type` | — | `air`, `liquid`, `mixed`, `passive` |
+
+*(NetBox 4.7+)* Core `cooling_method` on DeviceType/ModuleType/Device uses `air`, `liquid`, `hybrid`, `immersion`. If you copy NDX `cooling_type` into it: `mixed` → `hybrid`; `passive` has no core equivalent (leave unset). NDX does not document writing this field on import.
 
 ## Environmental (`has_environmental`)
 

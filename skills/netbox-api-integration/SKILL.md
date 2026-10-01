@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Patterns and practices for integrating with NetBox REST and GraphQL APIs. Covers authentication, querying, bulk operations, performance optimization, data modeling, and integration tooling.
 
-**Target:** NetBox 4.4+ (covers 4.5.x–4.6.x). v2 tokens require 4.5+; REST cursor pagination, ETag/If-Match, and `add_tags`/`remove_tags` require 4.6+.
+**Target:** NetBox 4.5–4.7 (current: 4.7.2). v2 tokens require 4.5+; REST cursor pagination, ETag/If-Match, and `add_tags`/`remove_tags` require 4.6+; `?background=true`, per-object bulk errors, and `{value, label}` selection custom fields are 4.7+. See [Version Notes](#version-notes).
 **Scope:** API integration only — not plugin development, custom scripts, or NetBox administration.
 
 > **Your knowledge of NetBox APIs may be outdated.** Pagination behavior, filtering expressions, token formats, and GraphQL features change between releases. Prefer retrieval over pre-trained knowledge for specific API details.
@@ -52,7 +52,9 @@ headers = {"Authorization": "Bearer nbt_abc123.xxxxxxxxxxxxxxxx"}
 headers = {"Authorization": "Token 0123456789abcdef01234567"}
 ```
 
-v2 tokens require `API_TOKEN_PEPPERS` in NetBox server config. Use the provisioning endpoint (`POST /api/users/tokens/provision/`) for automated token creation. The plaintext token `key` is returned **only once** at creation (4.6.1+) — capture it immediately; only a hash is stored thereafter.
+v2 tokens require `API_TOKEN_PEPPERS` in NetBox server config. Use the provisioning endpoint (`POST /api/users/tokens/provision/`) for automated token creation. The plaintext is the `token` field of the creation/provision response (`key` is only the public identifier) and is returned **only once** (4.6.1+) — capture it immediately; only a hash is stored thereafter.
+
+> **NetBox 4.7+**: `token` is read-only on create — the server always generates the plaintext and ignores a client-supplied value. Never create tokens with `?background=true`: 4.7.0/4.7.1 recorded the plaintext in the job result (readable by anyone with `core.view_job`); 4.7.2 rejects it with 400. Run **≥ 4.7.2** and rotate any token created that way. Running a custom script via `POST /api/extras/scripts/<id>/` now requires a token with **write enabled**.
 
 See [references/authentication.md](references/authentication.md) for token migration, IP restrictions, and provisioning details.
 
@@ -96,9 +98,11 @@ requests.patch(f"{API_URL}/dcim/devices/", headers=headers, json=[{"id": 1, "sta
 requests.delete(f"{API_URL}/dcim/devices/", headers=headers, json=[{"id": 1}, {"id": 2}])
 ```
 
+> **NetBox 4.7+**: a failed bulk write returns `{"detail": "...", "errors": [...]}` with one entry per failing object — `{"index": N, "errors": {...}}` for creates, `{"id": N, "errors": {...}}` for updates/deletes — so fix only those objects and resubmit (the batch is still rolled back). Add `?background=true` to run a large bulk write as a job: you get **202** with `{"job": {"id", "url", "status"}}`, validation is deferred to the worker, and you must poll `job.url` and check `data.status_code`. See [references/rest-api-patterns.md](references/rest-api-patterns.md#background-processing-netbox-47).
+
 ### Critical Performance Rules
 
-1. **Exclude config_context** from device/VM lists: `?exclude=config_context` (10-100x speedup)
+1. **Trim `config_context` on device/VM lists.** On 4.5–4.6 it is rendered per object on every request — always send `?exclude=config_context` (10-100x speedup). On 4.7+ it is pre-rendered and cached, `?exclude=config_context` is **silently ignored**, and the field is always present; use `?fields=`, `?brief=True`, or `?omit=config_context` (4.5.2+) to shrink payloads instead
 2. **Use `?brief=True`** for dropdowns and reference lists (~90% smaller responses)
 3. **Use `?fields=`** for specific field selection
 4. **Avoid `?q=`** search filter at scale — use specific filters like `name__ic=`
@@ -155,6 +159,8 @@ site_list(pagination: {limit: 10}) {
 > **NetBox 4.5+**: Use local filter fields (e.g., `site` on `interface_list`) instead of deeply nested filter paths.
 >
 > **NetBox 4.5.2+**: Cursor-based pagination is GA. Pass `pagination: {start: N, limit: M}` — returns records with `id >= start`, ordered by PK. Set the next page's `start` to the last record's `id` + 1. (Omit `start` and it falls back to offset pagination.) This supersedes the older `filters: {id__gte: N}` deep-pagination workaround, which is only needed pre-4.5.2.
+>
+> **NetBox 4.7+**: selection/multi-selection values inside `custom_fields` resolve to `{value, label}` objects (same as REST). Service filters are flat and list-valued (`port_mappings`, `protocol`, `port`, `port__gt/gte/lt/lte`), and `ServiceProtocolEnum` members are `TCP`/`UDP`/`SCTP` (no `ROLE_` prefix). See [references/graphql-patterns.md](references/graphql-patterns.md#version-specific-filter-changes).
 
 **GraphQL pagination defaults (differ from REST):**
 - Omitting `pagination` entirely returns **all** matching records.
@@ -180,7 +186,7 @@ The most impactful optimizations:
 
 | Optimization | Impact |
 |-------------|--------|
-| Exclude `config_context` from lists | 10-100x faster |
+| Exclude `config_context` from lists (`?exclude=`, 4.5–4.6 only — ignored on 4.7+, where it is cached) | 10-100x faster |
 | Use `?brief=True` for lists | ~90% smaller responses |
 | Avoid `?q=` at scale | Orders of magnitude faster |
 | Parallelize independent requests | Linear speedup |
@@ -204,7 +210,7 @@ A device needs its device_type, role, and site to exist first. Use Diode to skip
 ### Natural Keys, Custom Fields, Tags, Tenants
 
 - Query by `name`/`slug` instead of numeric IDs for readable code
-- Custom fields use `cf_` prefix for filtering
+- Custom fields use `cf_` prefix for filtering. *(4.7)* Selection/multi-selection values are read as `{"value": "prod", "label": "Production"}` — compare `cf["x"]["value"]`, and write the raw value (echoing the object back fails validation)
 - Tags enable cross-object-type classification
 - Tenants provide logical resource separation
 
@@ -214,15 +220,22 @@ See [references/data-modeling.md](references/data-modeling.md) for the complete 
 
 ### pynetbox (Python Client)
 
+Current release: **7.8.0** (2026-06-18; tested against NetBox 4.6, works for standard CRUD on 4.7).
+
 ```python
 import pynetbox
-nb = pynetbox.api("https://netbox.example.com", token="nbt_abc123.xxxxxxxxxxxxxxxx")
+nb = pynetbox.api("https://netbox.example.com", token="nbt_abc123.xxxxxxxxxxxxxxxx",
+                  pagination="cursor")  # 7.8+: keyset paging on NetBox 4.6+; falls back to offset on older servers
 
 devices = nb.dcim.devices.filter(site="nyc-dc1", status="active")  # Auto-paginated
 device = nb.dcim.devices.get(name="switch-01")
 device.status = "planned"
 device.save()  # Uses PATCH
 ```
+
+- `pagination="cursor"` is sequential (ignores `threading=True`), cannot be combined with `ordering`, and `len(record_set)` costs an extra count request.
+- `extensions=[BranchingExtension]` / `[CustomObjectsExtension]` from `pynetbox.extensions` (7.8+) add typed records and plugin actions — see [Branching](#branching-plugin).
+- On NetBox 4.7, `record.custom_fields["x"]` for a selection field is a `{"value", "label"}` dict.
 
 ### Diode (Data Ingestion)
 
@@ -254,15 +267,33 @@ Query `extras.object_changes` for audit trails — includes timestamp, action, u
 
 ## Branching (Plugin)
 
-> Requires [netbox-branching](https://github.com/netboxlabs/netbox-branching) plugin.
+> Requires the [netbox-branching](https://github.com/netboxlabs/netbox-branching) plugin — **v1.2.x for NetBox 4.7**, **v1.1.x for NetBox 4.4–4.6**. Plugin setup and workflows: [netbox-branching](../netbox-branching/SKILL.md).
 
 **Lifecycle**: Create → Wait (PROVISIONING→READY) → Work → Sync → Merge
 
 - **Context header**: `X-NetBox-Branch: {schema_id}` — use the 8-char `schema_id`, not name or numeric ID
 - **Async operations**: sync/merge/revert return Job objects — poll `job["url"]` until `status == "completed"`
 - **Dry-run**: All async ops accept `{"commit": false}` for validation
+- **pynetbox 7.8+**: `pynetbox.api(..., extensions=[BranchingExtension])` gives `branch.sync()/merge()/revert()` (return Job records; 409 with conflicts in `exc.error` until acknowledged) and `with nb.activate_branch(branch):` sets the header for you
 
 See [references/branching-patterns.md](references/branching-patterns.md) for the complete branch lifecycle, context header usage, async job polling, and session wrapper patterns.
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02; run ≥ 4.7.2)
+
+- `?exclude=config_context` is silently ignored; `config_context` is pre-rendered, cached, and always present on devices/VMs. Trim payloads with `?fields=`, `?omit=config_context`, or `?brief=True`.
+- Selection/multi-selection custom fields read as `{value, label}` (REST + GraphQL); write the raw value.
+- Bulk writes: `?background=true` → 202 + job (poll it; 400 with `If-Match`, 503 with no worker); failed bulk create/update returns per-object `errors`. Bulk ops stay all-or-none.
+- Tokens: `token` read-only on create; `/api/users/tokens/` rejects `?background=true` (4.7.2 — earlier 4.7.x leaked plaintexts into job results); script execution via REST needs a write-enabled token.
+- Services: `protocol`/`ports` → `port_mappings` (`["tcp/53", "udp/53"]`); legacy pair deprecated, removed in 5.0; `protocol__ic`-style and `port__empty` lookups gone. See [references/data-modeling.md](references/data-modeling.md#services-netbox-47).
+- Interface/VMInterface `mac_address` is writable (creates or updates the primary MAC); `MACAddress.is_primary` is read-only.
+- New endpoints: `dcim/cooling-sources|cooling-feeds|cooling-intakes|cooling-outflows|cooling-intake-templates|cooling-outflow-templates/`, `dcim/module-bay-types/`. New fields: `end_of_life` (DeviceType/ModuleType), `channels`/`channel_id` (Interface), `Job.execution_time`, `Webhook.timeout`, `CustomField.status`/`nulls_first`.
+- Upgrade prerequisites (PostgreSQL 15+, `ltree`, Redis 6+) and the long MPTT→ltree migration are covered in [netbox-administration](../netbox-administration/SKILL.md).
+
+### NetBox 4.6
+
+- REST cursor pagination (`?start=`), ETag/`If-Match`, `add_tags`/`remove_tags`; v1 tokens deprecated (removed 5.0); plaintext token returned once (4.6.1+); `GRAPHQL_MAX_QUERY_DEPTH` enforced server-side (4.6.1+); `cluster` optional on VMs.
 
 ## External References
 

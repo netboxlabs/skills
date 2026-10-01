@@ -2,7 +2,7 @@
 
 Reference for the [netbox-branching](https://github.com/netboxlabs/netbox-branching) plugin API: lifecycle, context headers, and async operations.
 
-> **Plugin Required:** All patterns here require the netbox-branching plugin.
+> **Plugin Required:** All patterns here require the netbox-branching plugin — **v1.2.x for NetBox 4.7** (1.2.0 minimum is NetBox 4.7.0), **v1.1.x for NetBox 4.4–4.6**. Install, configuration, and UI workflows: [netbox-branching](../../netbox-branching/SKILL.md).
 
 ## Branch Lifecycle
 
@@ -232,6 +232,32 @@ diff = requests.get(
     f"{NETBOX_URL}/api/plugins/branching/branches/{branch_id}/diff/",
     headers=HEADERS).json()
 print(f"Changes to merge: {len(diff)} modifications")
+```
+
+## pynetbox (7.8+)
+
+`BranchingExtension` adds `sync()`, `merge()`, `revert()` (each returns a Job record) and `archive()` on branch records, keeps the JSON columns on `changes` as plain dicts, and `nb.activate_branch(branch)` sets `X-NetBox-Branch` for the duration of a `with` block:
+
+```python
+import pynetbox
+from pynetbox.extensions import BranchingExtension
+
+nb = pynetbox.api("https://netbox.example.com", token="nbt_abc123.xxxxxxxxxxxxxxxx",
+                  extensions=[BranchingExtension])
+
+branch = nb.plugins.branching.branches.create(name="feature-network-updates")
+# poll nb.plugins.branching.branches.get(branch.id) until str(branch.status) == "Ready"
+
+with nb.activate_branch(branch):
+    nb.dcim.devices.create(name="new-switch-01", site=1, device_type=1, role=1, status="planned")
+
+job = branch.merge(commit=False)          # dry run — poll job.url with wait_for_job() above
+try:
+    job = branch.merge(commit=True)
+except pynetbox.RequestError as exc:
+    if exc.req.status_code != 409:
+        raise
+    print("unacknowledged conflicts:", exc.error)   # resolve, or merge(commit=True, acknowledge_conflicts=True)
 ```
 
 ## References

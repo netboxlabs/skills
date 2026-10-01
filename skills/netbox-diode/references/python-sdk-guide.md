@@ -6,7 +6,7 @@
 pip install netboxlabs-diode-sdk
 ```
 
-**Requirements:** Python 3.10+, NetBox 4.5+ (covers 4.5.x–4.6.x); diode-sdk-python v1.12.0
+**Requirements:** Python 3.10+, NetBox 4.5+ (covers 4.5–4.7); diode-sdk-python v1.14.1 (entities regenerated for NetBox 4.7.0 in 1.14.0)
 
 ## Client Setup
 
@@ -33,8 +33,11 @@ with DiodeClient(
 | `app_version` | Yes | Producer application version |
 | `client_id` | Yes* | OAuth2 client ID (*or use `DIODE_CLIENT_ID` env var) |
 | `client_secret` | Yes* | OAuth2 client secret (*or use `DIODE_CLIENT_SECRET` env var) |
-| `max_auth_retries` | No | Auto-retry count on auth failure (default: 3) |
+| `max_auth_retries` | No | Attempt budget for both the OAuth2 token request and gRPC re-authentication on `UNAUTHENTICATED` (default: 3; env `DIODE_MAX_AUTH_RETRIES` overrides the argument) |
 | `cert_file` | No | Custom TLS certificate path (or `DIODE_CERT_FILE` env var) |
+| `sentry_dsn` | No | Sentry DSN for SDK error reporting (or `DIODE_SENTRY_DSN`) |
+
+> **Auth endpoint scheme** *(1.13+)*: the token request follows the target scheme — `grpc://`/`http://` targets authenticate over HTTP, `grpcs://`/`https://` over HTTPS — regardless of `DIODE_SKIP_TLS_VERIFY`, which only disables certificate verification.
 
 ### Environment Variables
 
@@ -47,7 +50,7 @@ with DiodeClient(
 | `DIODE_SKIP_TLS_VERIFY` | Skip TLS verification (dev only) | false |
 | `DIODE_SENTRY_DSN` | Sentry error reporting | (none) |
 | `DIODE_DRY_RUN_OUTPUT_DIR` | Dry run output directory | (none) |
-| `DIODE_MAX_AUTH_RETRIES` | Max auth retry attempts | 3 |
+| `DIODE_MAX_AUTH_RETRIES` | Max attempts for token fetch and gRPC re-auth (see [Auth Backoff](#auth-backoff)) | 3 |
 
 ## Entity Construction
 
@@ -86,6 +89,26 @@ device = Device(
     role="Access Switch",
 )
 ```
+
+### NetBox 4.7 Fields
+
+Available in 1.14.0+; only land against NetBox 4.7 with a matching Diode plugin:
+
+```python
+import datetime
+from netboxlabs.diode.sdk.ingester import DeviceType, Interface, ModuleType, Service, CoolingFeed
+
+DeviceType(model="Catalyst 9300", manufacturer="Cisco", cooling_method="air",
+           end_of_life=datetime.datetime(2030, 12, 31))
+ModuleType(model="C9300-NM-8X", manufacturer="Cisco", module_bay_types=["Network Module"])
+Interface(device="sw-01", name="Ethernet1", type="100gbase-x-qsfp28", channels=4)
+Interface(device="sw-01", name="Ethernet1/1", type="channel", parent="Ethernet1", channel_id=1,
+          mac_address="00:11:22:33:44:55")          # sets the primary MAC directly
+Service(device="dns-01", name="dns", port_mappings=["tcp/53", "udp/53"])  # not protocol=/ports=
+CoolingFeed(name="CDU1-Loop-A", cooling_source="CDU-1", rack="R101", status="active")
+```
+
+See [entity-catalog.md](entity-catalog.md#netbox-47-additions) for the full field list.
 
 ### Metadata
 
@@ -155,6 +178,10 @@ except DiodeClientError as e:
     # gRPC transport error
     log.error(f"gRPC {e.status_code}: {e.details}")
 ```
+
+### Auth Backoff
+
+*(1.13+)* The OAuth2 token request retries on `429`, `500`, `502` and `503` with exponential backoff (1s, doubling, capped at 30s, plus up to 25% jitter), honouring `Retry-After` on `429`/`503`. Other non-200 responses (e.g. `401` bad credentials) raise `DiodeConfigError` immediately. The attempt budget is `max_auth_retries`; `ingest()` separately re-authenticates and retries up to the same budget when the server returns `UNAUTHENTICATED`. There is no proactive refresh before expiry in the Python SDK — long-lived clients simply re-auth on the first rejected call.
 
 ## Dry Run Client
 

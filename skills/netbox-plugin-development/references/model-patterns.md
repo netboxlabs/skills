@@ -15,7 +15,7 @@ django.db.Model
 - `NetBoxModel` — generic plugin object, you define all fields
 - `PrimaryModel` — object with description + comments (e.g., a circuit, a service)
 - `OrganizationalModel` — categorization object with unique name/slug (e.g., a role, a type)
-- `NestedGroupModel` — hierarchical grouping (e.g., regions, location types); deprecated in 4.7 — use `NestedLtreeGroupModel` if `min_version` >= `'4.7.1'`
+- `NestedGroupModel` — hierarchical grouping (e.g., regions, location types); deprecated in 4.7 — use `NestedLtreeGroupModel` if `min_version` >= `'4.7.1'` (see [Hierarchical Models](#hierarchical-models-ltree))
 
 ## NetBoxFeatureSet Mixins
 
@@ -53,6 +53,22 @@ Use in model field:
 ```python
 type = models.CharField(max_length=50, choices=AccessListTypeChoices)
 ```
+
+> **NetBox 4.7+**: `Choice(value, label, color=None, description=None)` (from `utilities.choices`)
+> adds a description that NetBox's `ChoiceField`/`MultipleChoiceField` render under the option, and
+> operators may supply `FIELD_CHOICES` entries as dicts instead of tuples. `Choice` does not exist on
+> 4.5/4.6 — plugins spanning versions keep the tuple form.
+>
+> ```python
+> from utilities.choices import Choice, ChoiceSet
+>
+> class AccessListTypeChoices(ChoiceSet):
+>     key = 'AccessList.type'
+>     CHOICES = [
+>         Choice('standard', 'Standard', color='blue', description='Source-address matching only'),
+>         Choice('extended', 'Extended', color='orange', description='Source, destination, and ports'),
+>     ]
+> ```
 
 ## RestrictedQuerySet
 
@@ -106,6 +122,36 @@ assigned_object = GenericForeignKey('assigned_object_type', 'assigned_object_id'
 - Test migrations both forward and backward: `python manage.py migrate netbox_myplugin zero`
 - Never import model classes directly in migration files — use `apps.get_model()`
 - `NestedLtreeGroupModel`: add `InstallLtreeTriggers('netbox_myplugin_<model>', name_column='name')` (from `utilities.ltree`) to the creating migration — makemigrations omits it, and without it `get_ancestors()`/`get_descendants()` silently return nothing
+- **Corrective migration:** 4.7.0's trigger definition could not survive `pg_dump`/restore (#23130, fixed 4.7.1). If any install of your plugin may have run the creating migration on 4.7.0, ship a follow-up migration with `ReinstallLtreeTriggers('netbox_myplugin_<model>', name_column='name')` (same arguments): identical forwards, no-op in reverse — reversing `InstallLtreeTriggers` would drop the triggers and functions entirely. Model it on NetBox's `dcim/migrations/0251_fix_ltree_cascade_triggers.py`
+
+## Hierarchical Models (ltree)
+
+```python
+from netbox.models import NestedLtreeGroupModel   # 4.7+: name, slug, parent, owner, description, comments
+
+class LocationType(NestedLtreeGroupModel):
+    pass
+```
+
+- Set `min_version = '4.7.1'` (trigger fix above). `NestedGroupModel` (MPTT) still loads on 4.7 but is deprecated — keep it only while the plugin must also run on 4.5/4.6
+- Available: `get_ancestors()`, `get_descendants()`, `get_children()`, queryset `add_related_count()`, and `level` as a Python property — **never** in `filter()`/`order_by()`. Gone vs MPTT: `get_root()`, `get_family()`, `is_leaf_node()`, `move_to()`, `insert_at()`, and the `lft`/`rght`/`tree_id`/`level` columns
+- Supporting classes are shared with the MPTT base: `NestedGroupModelForm`/`ImportForm`/`BulkEditForm`/`FilterSetForm` (`netbox.forms`), `NestedGroupModelFilterSet` (`netbox.filtersets`), GraphQL filter `NestedGroupModelFilter`; the GraphQL type base is `netbox.graphql.types.NestedLtreeGroupObjectType`; the table column is `columns.TreeColumn` (`MPTTColumn` alias works on 4.5–4.7)
+- Converting an existing MPTT model is a schema + data migration (add the ltree `path` column, install triggers, backfill, drop the MPTT columns) — model it on NetBox's `dcim/migrations/0242_ltree_paths.py`
+
+## Dependent Objects (4.7.2+)
+
+If `save()` derives other objects (as `Cable.save()` traces cable paths), expose that work to
+callers that write rows without `save()` — change replay, restores, bulk imports:
+
+```python
+class AccessList(NetBoxModel):
+    def update_dependent_objects(self):
+        ...   # rebuild derived objects purely from database state; idempotent
+    update_dependent_objects.alters_data = True
+```
+
+Optional: NetBox never calls it during a normal save; callers check for it before calling, and
+exceptions propagate unchanged.
 
 ## get_absolute_url() Pattern
 

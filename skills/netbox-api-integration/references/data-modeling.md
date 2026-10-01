@@ -142,6 +142,26 @@ children = nb.ipam.prefixes.filter(within="10.0.0.0/16")
 available = nb.ipam.prefixes.get(prefix="10.0.1.0/24").available_ips.list()
 ```
 
+### Services (NetBox 4.7+)
+
+`ipam.Service` and `ServiceTemplate` model ports as `port_mappings` — a list of `"protocol/port"` strings — so one service can expose the same port on several protocols. The legacy `protocol` + `ports` pair is deprecated: still accepted on write (translated into `port_mappings`), populated on read only for single-protocol services (`null` otherwise), and **removed in 5.0**. Brief representations already show `port_mappings` only.
+
+```python
+# 4.7+: write port_mappings
+nb.ipam.services.create(name="dns", parent_object_type="dcim.device", parent_object_id=device.id,
+                        port_mappings=["tcp/53", "udp/53"])
+
+# 4.5–4.6 (still accepted on 4.7, but not for multi-protocol services)
+nb.ipam.services.create(name="dns", parent_object_type="dcim.device", parent_object_id=device.id,
+                        protocol="udp", ports=[53])
+
+# Filtering (4.7+): whole mapping, or correlated protocol + port (both must hold for one mapping)
+nb.ipam.services.filter(port_mappings="tcp/53")
+nb.ipam.services.filter(protocol="tcp", port__gte=8000, port__lte=8999)
+```
+
+4.7 removes the `protocol__ic`/`__isw`/`__empty` and `port__empty` lookups; `protocol__n` and `port__n` remain.
+
 ## Natural Keys
 
 Query by human-readable names instead of numeric IDs:
@@ -179,7 +199,14 @@ device.save()
 production = nb.dcim.devices.filter(cf_environment="production")
 ```
 
-Custom field types: Text, Integer, Boolean, Date, URL, Selection, Multi-select, Object.
+> **NetBox 4.7+**: selection and multi-selection values are **read** as `{"value": "production", "label": "Production"}` (multi-select: a list of them) via REST, GraphQL, and pynetbox. **Write** the raw value, as above — echoing the read object back fails validation. Unwrap defensively when a client spans 4.6 and 4.7:
+>
+> ```python
+> env = device.custom_fields["environment"]
+> env = env["value"] if isinstance(env, dict) else env
+> ```
+
+Custom field types: Text, Integer, Boolean, Date, URL, Selection, Multi-select, Object. *(4.7)* URL values are validated against the server's `ALLOWED_URL_SCHEMES`; a scheme-less value is stored as `https://…`.
 
 ## Tags
 

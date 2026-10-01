@@ -15,6 +15,7 @@ No dependencies. Create first.
 - RackRole
 - RackGroup *(4.6)* — flat organizational grouping
 - CableBundle *(4.6)* — group cables before creating them (Tier 13)
+- ModuleBayType *(4.7)* — optional `manufacturer`; assign to ModuleTypes (Tier 6) and module bay templates
 - IPAM Role
 - ContactRole
 - TunnelGroup
@@ -22,7 +23,7 @@ No dependencies. Create first.
 
 ## Tier 1: Hierarchical Taxonomies
 
-Self-referential. Create top-down (parents first).
+Self-referential. Create top-down (parents first). On 4.7+ these are ltree-backed: same `parent` FK, but a child's `name` must be unique under its parent and renames cascade to descendants automatically.
 
 - Region (parent → child)
 - SiteGroup (parent → child)
@@ -39,6 +40,7 @@ Self-referential. Create top-down (parents first).
 - Provider
 - ProviderAccount (needs: Provider)
 - ProviderNetwork (needs: Provider)
+- RackType (needs: Manufacturer required, `form_factor` required) — define one per physical rack model; Racks (Tier 5) should reference it
 
 ## Tier 3: Sites
 
@@ -48,17 +50,21 @@ Self-referential. Create top-down (parents first).
 
 - Location (needs: Site required, parent Location optional)
 - VLANGroup (needs: scope optional — Region/SiteGroup/Site/Location/Rack/ClusterGroup/Cluster, +RackGroup *(4.6)*)
+- PowerPanel (needs: Site required, Location optional)
+- CoolingSource *(4.7)* (needs: Site required, `type` required; Location optional)
 
 ## Tier 5: Racks & VLANs
 
-- Rack (needs: Site required, Location optional, RackRole optional, RackGroup optional *(4.6)*, Tenant optional)
+- Rack (needs: Site required, Location optional, RackType optional — **assign it**; per-rack dimensions deprecated 4.7, `rack_type` mandatory 5.0 —, RackRole optional, RackGroup optional *(4.6)*, Tenant optional)
+- PowerFeed (needs: PowerPanel required, Rack optional)
+- CoolingFeed *(4.7)* (needs: CoolingSource required, Rack optional, Tenant optional; rack must be in the source's site)
 - VLAN (needs: VLANGroup optional, Tenant optional, IPAM Role optional)
 
 ## Tier 6: Device Types
 
-- DeviceType (needs: Manufacturer required)
-- ModuleType (needs: Manufacturer required)
-- Component templates (InterfaceTemplate, etc.) are created on DeviceType
+- DeviceType (needs: Manufacturer required; *(4.7)* optional `cooling_method`, `end_of_life`)
+- ModuleType (needs: Manufacturer required; *(4.7)* optional M2M `module_bay_types`, `cooling_method`, `end_of_life`)
+- Component templates (InterfaceTemplate, ModuleBayTemplate, CoolingIntakeTemplate/CoolingOutflowTemplate *(4.7)*, etc.) are created on DeviceType/ModuleType. *(4.7)* ModuleBayTemplate `module_bay_types` propagate to instantiated bays; InterfaceTemplate supports `channels`/`channel_id`/`parent`
 
 ## Tier 7: Clusters & Virtual Infrastructure
 
@@ -67,8 +73,10 @@ Self-referential. Create top-down (parents first).
 ## Tier 8: Devices
 
 - Device (needs: DeviceType required, DeviceRole required, Site required; Location, Rack, Platform, Tenant, Cluster optional)
-- Components (Interface, ConsolePort, PowerPort) auto-created from DeviceType templates
-- Module (needs: Device, ModuleType, ModuleBay)
+- Components (Interface, ConsolePort, PowerPort, CoolingIntake/CoolingOutflow *(4.7)*) auto-created from DeviceType templates
+- Module (needs: Device, ModuleType, ModuleBay; *(4.7)* if both bay and module type declare `module_bay_types` they must share one)
+- Channel subinterfaces *(4.7)* (needs: parent Interface with `channels` set; one subinterface per `channel_id`, 1-based)
+- CoolingIntake → `cooling_outflow` links *(4.7)* (needs: the upstream CoolingOutflow's device — usually a CDU — to exist first)
 
 ## Tier 9: Virtual Machines
 
@@ -90,7 +98,7 @@ Self-referential. Create top-down (parents first).
 
 - Interface → IP address assignments
 - Device primary_ip4 / primary_ip6 (needs: IPAddress assigned to device interface)
-- Service (needs: Device or VM)
+- Service (needs: Device or VM; `port_mappings` on 4.7+, `protocol` + `ports` on 4.5–4.6)
 - FHRPGroup + FHRPGroupAssignment
 
 ## Tier 12: Circuits

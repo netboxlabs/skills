@@ -1,5 +1,7 @@
 # Check Reference — All 95 Built-in Checks
 
+Checks evaluate NetBox data server-side; parameters below are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` always present) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+
 ## Intent Checks (44)
 
 ### Addressing (8)

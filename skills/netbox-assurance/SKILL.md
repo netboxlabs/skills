@@ -234,7 +234,7 @@ Assign these through NetBox's standard user/group permission system.
 
 ## Prerequisites
 
-- **NetBox Cloud or NetBox Enterprise** with Assurance enabled (on Enterprise, your license file determines whether Assurance services are installed; on Cloud it's a licensed add-on). The Assurance plugin supports NetBox **4.4.10 through 4.6.x** (current plugin line v1.5.x).
+- **NetBox Cloud or NetBox Enterprise** with Assurance enabled. The docs state the requirement as **NetBox Enterprise 1.10+ with an Assurance entitlement** (the license file determines whether Assurance services are installed) or a NetBox Cloud add-on to a Starter, Professional or Premium plan. The Assurance plugin has no public release feed; the v1.5.x line documented here was validated on NetBox 4.4.10 and later 4.x releases — the NetBox version you get is the one bundled with your Cloud/Enterprise platform release, so check the Assurance docs for the current pairing rather than assuming a ceiling.
 - At least one configured data source
 - Network connectivity between data sources and the Assurance service
 
@@ -274,6 +274,17 @@ Assign these through NetBox's standard user/group permission system.
 3. **Stale inventory detection is limited** — detecting objects that should be removed from NetBox (because they no longer exist on the network) depends on observation timestamps and is an evolving capability
 4. **Not a real-time system** — there is inherent latency between network changes, discovery, analysis, and deviation availability
 5. **Branch scoping** — when using branches, ensure you're reviewing deviations against the correct branch context
+
+## Version Notes
+
+### NetBox 4.7 (2026-09-02)
+
+- Data sources built on diode-sdk-python 1.14.x / diode-sdk-go 1.12.0 can emit the 4.7 models (cooling, `ModuleBayType`) and fields (`Interface.channels`/`channel_id`, `Service.port_mappings`, `DeviceType.end_of_life`, `cooling_method`), so those become comparable once the platform bundles NetBox 4.7 — see [references/data-sources.md](references/data-sources.md).
+- REST responses you read while triaging (selection custom fields as `{"value", "label"}` objects, `port_mappings` on services, per-object bulk errors) changed shape — see [references/deviation-lifecycle.md](references/deviation-lifecycle.md#netbox-47-api-changes-that-affect-remediation).
+
+### NetBox 4.6
+
+- Diode SDKs (python 1.12.0 / go 1.9.0) added `CableBundle`, `RackGroup`, `VirtualMachineType`; switch-stack discovery emits `VirtualChassis` + member devices.
 
 ## References
 

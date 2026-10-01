@@ -45,6 +45,10 @@ curl -X POST "$NETBOX_URL/api/plugins/validation/rules/" \
 curl -X PATCH "$NETBOX_URL/api/plugins/validation/rules/5/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"parameters": {"min_uplinks": 2}, "severity": "high"}'
+
+# Delete a rule (plugin 1.13+: prior runs keep its name/outcome as "(deleted rule)")
+curl -X DELETE "$NETBOX_URL/api/plugins/validation/rules/5/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
 
 ## Run Lifecycle
@@ -118,7 +122,16 @@ curl "$NETBOX_URL/api/plugins/validation/findings/?severity=critical&status=open
 curl -X PATCH "$NETBOX_URL/api/plugins/validation/findings/42/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"status": "acknowledged"}'
+
+# Bulk status change / counts by status, severity, category (both honor the findings filters)
+curl -X POST "$NETBOX_URL/api/plugins/validation/findings/bulk-update-status/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"ids": [42, 43, 44], "status": "acknowledged"}'
+curl "$NETBOX_URL/api/plugins/validation/findings/summary/?status=open" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
+
+Remediating a finding means writing to core NetBox objects — on NetBox **4.7** selection custom fields read back as `{"value", "label"}` (write the raw value), services take `port_mappings`, and failed bulk writes report per-object errors by `index`. See [netbox-api-integration](../../netbox-api-integration/SKILL.md).
 
 ## Compliance Scores
 

@@ -69,6 +69,24 @@ for p in prefixes['results']:
 result = {'count': len(rows), 'prefixes': rows}
 ```
 
+## I. Read a selection custom field portably (NetBox 4.5–4.7)
+
+```python
+devs = get('dcim.device', filters={'site': 'nyc-dc1'}, fields=['id', 'name', 'custom_fields'], limit=1000)
+def cf(d, name):
+    v = (d.get('custom_fields') or {}).get(name)
+    return v['value'] if isinstance(v, dict) else v      # 4.7+: {'value', 'label'}; 4.5–4.6: raw value
+result = [d['name'] for d in devs['results'] if cf(d, 'environment') == 'prod']
+```
+
+## J. Multi-protocol service on NetBox 4.7+
+
+```python
+result = create('ipam.service', {'parent_object_type': 'dcim.device', 'parent_object_id': 42,
+                                 'name': 'dns', 'port_mappings': ['tcp/53', 'udp/53']})
+# 4.5–4.6: one protocol per service — {'protocol': 'udp', 'ports': [53]}
+```
+
 ## Recovery — only when the tool inventory is genuinely stale
 
 ```python
@@ -79,4 +97,4 @@ rediscover_netbox()
 
 ## Handling a write error
 
-HTTP errors surface the NetBox response body, including per-field validation detail. On a failed `create()`/`update()`, read the returned error, correct the payload, and retry in the next program — don't blindly repeat the same call.
+HTTP errors surface the NetBox response body, including per-field validation detail. On a failed `create()`/`update()`, read the returned error, correct the payload, and retry in the next program — don't blindly repeat the same call. On NetBox **4.7+** a failed `bulk_create`/`bulk_update` body is `{'detail': ..., 'errors': [{'index': N, 'errors': {...}}, ...]}` (`'id'` instead of `'index'` for updates) — the batch was rolled back; fix exactly those entries and resubmit the whole list. On 4.5–4.6 only the first failure is reported.

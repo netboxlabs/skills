@@ -45,26 +45,31 @@ Objects must be created in dependency order — a Device can't reference a Site 
 | Object | API Endpoint | Required Fields | Dependencies |
 |---|---|---|---|
 | RackGroup *(4.6)* | `/api/dcim/rack-groups/` | name, slug | — (flat organizational grouping) |
-| Rack | `/api/dcim/racks/` | name, site | site, location, role, **group (RackGroup, 4.6)**, tenant (optional) |
+| Rack | `/api/dcim/racks/` | name, site | site, location, role, **group (RackGroup, 4.6)**, tenant (optional); *(4.7)* `cooling_capability`, `cooling_capacity` (optional) |
+| CoolingSource *(4.7)* | `/api/dcim/cooling-sources/` | name, site, type | site (required), location (optional) |
+| CoolingFeed *(4.7)* | `/api/dcim/cooling-feeds/` | name, cooling_source | cooling_source (required), rack, tenant (optional) |
 
 ### Tier 6: Device Taxonomy
 
 | Object | API Endpoint | Required Fields | Dependencies |
 |---|---|---|---|
-| DeviceType | `/api/dcim/device-types/` | manufacturer, model, slug | manufacturer |
-| ModuleType | `/api/dcim/module-types/` | manufacturer, model | manufacturer |
+| ModuleBayType *(4.7)* | `/api/dcim/module-bay-types/` | name, slug | manufacturer (optional) — create before module types / bay templates that reference it |
+| DeviceType | `/api/dcim/device-types/` | manufacturer, model, slug | manufacturer; *(4.7)* `end_of_life` (date), `cooling_method` (optional) |
+| ModuleType | `/api/dcim/module-types/` | manufacturer, model | manufacturer; *(4.7)* `module_bay_types` (M2M), `end_of_life`, `cooling_method` (optional) |
 | Platform | `/api/dcim/platforms/` | name, slug | manufacturer (optional) |
 
-**Note:** DeviceTypes should include component templates (interfaces, power ports, console ports). Use YAML import for DeviceTypes — CSV doesn't support component templates. The [NetBox Device Type Library](https://github.com/netbox-community/devicetype-library) has pre-built definitions.
+**Note:** DeviceTypes should include component templates (interfaces, power ports, console ports; *(4.7)* cooling intake/outflow templates, `module_bay_types` on module bay templates, `channels`/`channel_id` on interface templates). Use YAML import for DeviceTypes — CSV doesn't support component templates; the YAML importer accepts `end_of_life` and `cooling_method` on 4.7. The [NetBox Device Type Library](https://github.com/netbox-community/devicetype-library) has pre-built definitions.
 
 ### Tier 7: Devices
 
 | Object | API Endpoint | Required Fields | Dependencies |
 |---|---|---|---|
 | Device | `/api/dcim/devices/` | name, device_type, role, site | device_type, role, site, location, rack, platform, tenant (optional) |
-| Module | `/api/dcim/modules/` | device, module_bay, module_type | device, module_type |
+| Module | `/api/dcim/modules/` | device, module_bay, module_type | device, module_type; *(4.7)* if both the bay and the module type declare `module_bay_types`, they must share at least one |
 
-Components (interfaces, power ports, console ports) are **auto-created from DeviceType templates**. Don't re-create them — query existing ones and update if needed.
+Components (interfaces, power ports, console ports; *(4.7)* cooling intakes/outflows) are **auto-created from DeviceType templates**. Don't re-create them — query existing ones and update if needed.
+
+*(4.7)* **Channelized (breakout) interfaces:** set `channels` on the parent interface, then create one subinterface per channel with `type: "channel"`, `parent: <parent id>`, `channel_id: N` (unique per parent). Cables terminate on the parent. *(4.7)* An installed module can be relocated by PATCHing its `module_bay` instead of delete + recreate.
 
 ### Tier 8: IPAM Foundation
 
@@ -84,6 +89,7 @@ Components (interfaces, power ports, console ports) are **auto-created from Devi
 | Prefix | `/api/ipam/prefixes/` | prefix | vrf, vlan, role, tenant, site (optional) |
 | IPRange | `/api/ipam/ip-ranges/` | start_address, end_address | vrf, role, tenant (optional) |
 | IPAddress | `/api/ipam/ip-addresses/` | address | vrf, tenant, assigned_object (optional) |
+| Service | `/api/ipam/services/` | name, parent_object_type, parent_object_id, **`port_mappings` *(4.7)*** / `protocol` + `ports` (4.5–4.6) | parent device/VM; ipaddresses (optional) |
 
 After creating IPs and assigning to interfaces, **update Device.primary_ip4/primary_ip6** in a second pass. This is the circular dependency — device must exist to create interface, IP must exist to set primary_ip.
 

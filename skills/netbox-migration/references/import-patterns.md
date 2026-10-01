@@ -106,7 +106,40 @@ with open("devices.csv") as f:
             device.save()
 ```
 
-**Performance:** Use `?exclude=config_context` on device queries, `?brief=True` for lookups, batch bulk creates (~100/request — a tuning choice, not a NetBox limit), cache site/type lookups. On NetBox **4.6+** use cursor pagination (`?start=`) instead of deep `?offset=` when reading back large sets for validation, and add `?fields=` to project only the columns you need.
+**Performance:** Use `?brief=True` for lookups, batch bulk creates (~100/request — a tuning choice, not a NetBox limit), cache site/type lookups. On NetBox **4.6+** use cursor pagination (`?start=`) instead of deep `?offset=` when reading back large sets for validation, and add `?fields=` to project only the columns you need. Trimming `config_context` on device/VM reads: **4.5–4.6** send `?exclude=config_context`; **4.7+** ignores that parameter (config context is pre-rendered and always included) — `?fields=`/`?brief=True` is the way to keep read-back payloads small. Details: [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+
+### Bulk write errors and background jobs (NetBox 4.7+)
+
+Bulk create/update stays **all-or-none**, but on 4.7 a failed batch reports every offending object by its position in the list you sent (`{"detail": ..., "errors": [{"index": N, "errors": {...}}]}`; bulk updates/deletes key on `"id"` instead of `"index"`). Map errors back to source rows, fix only those, resubmit the batch. On 4.5–4.6 you get a single error for the first failure — bisect the batch instead.
+
+```python
+import requests
+
+API = "https://netbox.example.com/api"
+H = {"Authorization": "Token nbt_abc123.xxxxxxxxxxxxxxxx", "Content-Type": "application/json"}
+
+def bulk_create(endpoint, rows, payloads):
+    # rows[i] is the source record that produced payloads[i]
+    r = requests.post(f"{API}/{endpoint}/", headers=H, json=payloads, timeout=120)
+    if r.ok:
+        return r.json(), []
+    body = r.json()
+    bad = []
+    for err in body.get("errors", []):          # 4.7+: one entry per failing object
+        i = err.get("index")
+        bad.append((rows[i] if i is not None else None, err["errors"]))
+    if not bad:                                  # 4.5–4.6 (or non-bulk error): whole-batch detail only
+        bad.append((None, body))
+    return None, bad
+
+created, failures = bulk_create("dcim/devices", source_rows, device_payloads)
+for row, errors in failures:
+    print(f"row {row and row['hostname']}: {errors}")   # fix in source, re-run the batch
+```
+
+Large batches that risk proxy/gateway timeouts can be deferred to a worker with `?background=true`: the request returns **202** with `{"job": {"id", "url", "status"}}`, validation happens in the worker, and you must poll the job (`GET /api/core/jobs/<id>/`) until `status` is `completed` (or `errored`/`failed`) and read the captured response in `data`. Never create API tokens this way — run **≥ 4.7.2**. Polling pattern: [netbox-api-integration](../../netbox-api-integration/references/rest-api-patterns.md#background-processing-netbox-47).
+
+**Custom fields (NetBox 4.7+):** write the raw value (`"custom_fields": {"environment": "prod"}`); on read-back a selection field comes back as `{"value": "prod", "label": "Production"}` — compare `["value"]` when verifying. **Services (4.7+):** send `"port_mappings": ["tcp/443", "udp/53"]` instead of `protocol` + `ports` (the legacy pair is still accepted on 4.7, removed in 5.0; on 4.5–4.6 only the legacy pair exists).
 
 **Provenance tagging (NetBox 4.6+):** to stamp imported objects with an "imported-from-X" tag without clobbering existing tags, use the write-only `add_tags` / `remove_tags` serializer fields instead of read-modify-writing the full `tags` list — safer for re-runnable importers and concurrent writers.
 
@@ -154,13 +187,15 @@ with DiodeClient(
 
 **Advantages:** No dependency ordering, upsert semantics, slug auto-generation, high throughput.
 
-**Limitations:** Write-only (use REST API to verify), case-sensitive matching, less attribute control, requires Diode server.
+**Limitations:** Write-only (use REST API to verify), case-sensitive matching, less attribute control, requires Diode server. Match the SDK to the NetBox target — the ingester was regenerated for NetBox 4.7 in diode-sdk-python 1.14.0 / diode-sdk-go 1.12.0 (current: 1.14.1 / 1.12.0).
 
 For full Diode patterns, see [netbox-diode](../../netbox-diode/SKILL.md).
 
 ## Strategy 4: Custom Scripts (In-NetBox)
 
 **Best for:** Patterned data generation, transforms on existing NetBox data.
+
+> **NetBox 4.7+**: core custom scripts are **deprecated** (still supported through 4.7 and 4.8, removed in 5.0 in favor of a dedicated plugin) — don't build new migration tooling on them. Also, hierarchical models are `ltree`-backed on 4.7: `Region.objects.filter(level=0)`, `order_by('level')`, `move_to()`, `insert_at()`, `get_root()` no longer work; use `parent__isnull=True`, `get_ancestors()`, `get_descendants()`, `get_children()`.
 
 ```python
 from dcim.models import Site

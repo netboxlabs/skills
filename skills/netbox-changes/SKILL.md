@@ -37,9 +37,11 @@ The **netbox_changes** plugin adds a code-review-style workflow on top of
 [NetBox Branching](../netbox-branching/SKILL.md). Every branch can have one
 Change Request (CR) that gates merge via policies and reviews.
 
-**Plugin:** `netbox_changes` 1.0.x (latest v1.0.1) · **NetBox:** 4.4–4.6 · **Base URL:** `/api/plugins/changes/`
+**Plugin:** `netbox_changes` 1.1.x (latest **v1.1.3**, 2026-09-09) · **NetBox:** **4.5.2–4.7** (1.0.2 raised the floor from 4.4 to 4.5.2; 1.1.3 added 4.7) · **Base URL:** `/api/plugins/changes/`
 
-> **Plugin v1.0+** changed CR lifecycle semantics vs the 0.4.x line: a branch may hold multiple CRs (one *active* at a time), rejected CRs can be reopened/replaced, `policy` is required, and `changes-requested` is a settable status under an unmet policy. These are flagged inline below.
+**Pairing with branching:** Changes requires netbox-branching at the line matching your NetBox — **branching 1.1.x on NetBox 4.5.2–4.6**, **branching 1.2.x on NetBox 4.7**. A mismatch prevents NetBox from starting. See [netbox-branching](../netbox-branching/SKILL.md).
+
+> **Plugin v1.0+** changed CR lifecycle semantics vs the 0.4.x line: a branch may hold multiple CRs (one *active* at a time), rejected CRs can be reopened/replaced, `policy` is required, and `changes-requested` is a settable status under an unmet policy. **v1.1.0** added per-policy `is_default` and `require_independent_review`. Flagged inline below; see [Version Notes](#version-notes).
 
 ## Quick Reference
 
@@ -53,6 +55,7 @@ Change Request (CR) that gates merge via policies and reviews.
 | `policy-rules/` | Rules within policies |
 | `comments/` | CR comments |
 | `comment-replies/` | Threaded replies |
+| `change-requests/<id>/retrigger/` (POST) | Re-emit event rules for a CR (`event_retriggered`); needs `change` permission and a write-enabled token |
 
 ### CR Statuses (exact values)
 
@@ -61,6 +64,8 @@ Change Request (CR) that gates merge via policies and reviews.
 ### Review Statuses
 
 `pending` · `comment` · `changes-requested` · `approved` · `rejected`
+
+`pending` is a "review requested, not yet submitted" placeholder — never POST it. The review form hides it (1.1.1+) and the REST API rejects it: `pending is not a valid status for a submitted review.`
 
 ## Core Concepts
 
@@ -142,6 +147,7 @@ POST /api/plugins/changes/change-requests/
 - `owner` is set automatically — do NOT include it
 - `branch` is the branch PK (must exist, must not already have an *active* CR)
 - `policy` is **required** (v1.0+) — a non-null FK on every CR; a POST without `policy` fails. (It also drives merge gating.)
+- *(1.1.0+)* the policy flagged `is_default: true` (at most one) is **pre-selected in the UI form only** — the REST API does not fill it in. Find it with `GET /api/plugins/changes/policies/?is_default=true` and pass its `id`.
 - `priority` is an integer (1=low, 5=high)
 
 ## Review Workflow
@@ -179,9 +185,14 @@ review, that review becomes **stale** and may need to be re-submitted.
 A **Policy** contains one or more **PolicyRules**. ALL enabled rules must pass
 for the policy to be satisfied.
 
+### Policy Fields *(1.1.0+)*
+
+- `is_default` — pre-selected on the UI CR form; at most one policy (validation error `A default policy already exists: <name>.`). No effect on the REST API.
+- `require_independent_review` — the CR **owner's own reviews never count** toward this policy's rules. Owner can still post reviews (they're recorded, just excluded). If the owner is a rule's only eligible reviewer, the rule is unsatisfiable for their CRs. Default `false` (owner reviews count, as in 1.0.x).
+
 ### PolicyRule Fields
 
-- `min_reviews` — minimum approved (non-stale) reviews required (1–10)
+- `min_reviews` — minimum approved (non-stale) reviews required, **0–10**. `0` makes the rule always pass (not recommended).
 - `reviewers` — M2M to specific Users
 - `reviewer_groups` — M2M to Groups
 - Only reviews from users in `reviewers` ∪ `reviewer_groups` members count
@@ -200,8 +211,11 @@ examples and evaluation details.
 Merge gating is always active when the plugin is installed — there's no
 configuration toggle. Every branch merge requires an approved CR.
 
-If you try to merge a branch without an approved CR, the merge is blocked with:
-`"Merging this branch is not permitted."`
+If you try to merge a branch without an approved CR, the UI reports
+`No change request has been approved for this branch.` Via REST, the branching
+`merge/` endpoint still returns 200 + Job; the **job** then errors with
+`Merging this branch is not permitted.` — poll the job, don't trust the 200.
+Dry-run merges (`"commit": false`) bypass the gate.
 
 ## protect_main
 
@@ -221,6 +235,7 @@ PLUGINS_CONFIG = {
 - **Bypass permission (v1.0+):** grant the **`bypass`** custom action on the **Policy** object (NetBox Change Management → Policy in the ObjectPermission form). Superusers get it implicitly. Describe it as "the bypass action on Policy" rather than a single flat permission string — internally the codename is `bypass` while the enforcement check still references `bypass_policy`.
 - During branch merge/revert, protect_main is temporarily suspended
 - Error when blocked: `"Changes directly to main are not permitted."`
+- *(NetBox 4.7)* `?background=true` bulk writes run in a worker with **no active branch** even when sent with `X-NetBox-Branch` (the header isn't carried to the job), so protect_main rejects them with the error above — inspect the job, the request itself returns 202. Use synchronous bulk writes in branch context.
 
 See [references/protect-main.md](references/protect-main.md) for details.
 
@@ -257,6 +272,30 @@ GET /api/plugins/changes/policy-rules/?policy_id=1
 5. **Merge gating is mandatory** — no toggle, always active when plugin installed
 6. **protect_main is OFF by default** — must explicitly enable in config
 7. **`approved` is not manually settable** — only reached via policy satisfaction
+8. **Default policy is UI-only** *(1.1.0+)* — the API never auto-fills `policy`; look up `?is_default=true` and pass it
+9. **Self-approval under `require_independent_review`** *(1.1.0+)* — the owner's `approved` review is recorded but ignored; a rule whose only eligible reviewer is the owner can never pass for them
+10. **Never POST review status `pending`** — rejected by the API
+11. **You can only edit/delete your own reviews, comments, and replies** *(1.0.2+)* — including via bulk PATCH/DELETE (403 `You can only modify your own objects.`); superusers get no exemption
+12. **Malformed bulk request bodies** *(1.1.3+)* — a bulk PATCH/DELETE body that isn't a valid list of `{"id": ...}` objects is now passed through to NetBox's own bulk handler on every supported NetBox version, so the error is NetBox's (on 4.7: per-object `{"detail", "errors": [...]}`), not a plugin message. Fix clients that matched on the old plugin error text
+
+## Version Notes
+
+### Plugin 1.1.3 (2026-09-09) — NetBox 4.5.2–4.7
+- NetBox 4.7 support. Malformed bulk requests no longer pre-validated by the plugin (see anti-pattern 12). Requires branching 1.2.x on 4.7, 1.1.x on ≤4.6.
+
+### Plugin 1.1.0–1.1.2 (2026-06 → 2026-07) — NetBox 4.5.2–4.6
+- **1.1.0:** `Policy.is_default` (UI pre-select), `Policy.require_independent_review`, Policies/Policy Rules nav hidden without `view_policy`/`view_policyrule`, change summary shown on the CR detail page, status/priority help tooltips.
+- **1.1.1:** review form can't submit `pending`; NetBox 4.5.x migration compatibility fix.
+- **1.1.2:** migration marked `fake_on_branch` so it applies cleanly to branch schemas.
+
+### Plugin 1.0.x (2026-05 → 2026-06)
+- **1.0.0:** multiple CRs per branch (one active), reopen rejected CRs, `bypass` permission, owner notifications, `retrigger/` action, `context.last_branch_change` in CR webhook payloads.
+- **1.0.2:** **minimum NetBox 4.5.2**; edit/delete of reviews, comments, replies restricted to their owner (also in bulk); `change_comment` needed to resolve/unresolve.
+
+### NetBox 4.7 (2026-09-02) — what changes for CR automation
+- Event-rule conditions gain `changed`/`unchanged` and `snapshots.prechange.*` paths: fire only when a CR *becomes* approved instead of on every save — see [references/api-patterns.md](references/api-patterns.md#event-rules-for-cr-automation).
+- Webhook context keys `username` and `request_id` are gone; use `request.user` / `request.id` in body templates.
+- Per-object bulk errors and `?background=true` (don't use it in a branch — see protect_main above).
 
 ## References
 

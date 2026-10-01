@@ -22,7 +22,7 @@ available_ips_in_range(ip_range_id, limit=10) → available IPs in a range
 available_vlans(group_id, limit=10) → available VLANs
 available_asns(asn_range_id, limit=10) → available ASNs
 changelogs(filters={}, limit=50, offset=0) → audit-trail entries
-custom_field_choices(custom_field_id) → [{value, display}]
+custom_field_choices(custom_field_id) → [{value, display}]     # write the `value`; on NetBox 4.7+ reads return {value, label}
 discover_models(app=None, include_plugin_detail=False) → apps/endpoints (core + plugins)
 inspect_model(app, endpoint) → full field schema from OPTIONS
 ```
@@ -33,8 +33,8 @@ inspect_model(app, endpoint) → full field schema from OPTIONS
 create(type, data) → created object with ID
 update(type, id, data) → updated object (PATCH semantics)
 delete(type, id) → True
-bulk_create(type, [data]) → list of created objects
-bulk_update(type, [{id, ...fields}]) → list of updated objects
+bulk_create(type, [data]) → list of created objects        # all-or-none; 4.7+ failure surfaces errors[].index
+bulk_update(type, [{id, ...fields}]) → list of updated objects   # all-or-none; 4.7+ failure surfaces errors[].id
 bulk_delete(type, [ids]) → True
 sync_data_source(data_source_id) → data source with refreshed sync status
 ```

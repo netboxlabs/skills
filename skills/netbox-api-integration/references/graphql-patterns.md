@@ -220,6 +220,25 @@ filters: { site: {name: {exact: "NYC-DC1"}} }
 
 Common local filters: `interface_list` has `site`, `device_role`; `ip_address_list` has `site`; `cable_list` has `site`. Use GraphQL introspection to discover available filters.
 
+### Version-Specific Filter Changes
+
+> **NetBox 4.7+ — services.** `ServiceFilter`/`ServiceTemplateFilter` replace the nested `ports` lookup with flat, list-valued `port`, `port__gt`, `port__gte`, `port__lt`, `port__lte`, plus `port_mappings` (`["tcp/80"]`, any-match). `protocol` and the `port*` arguments are correlated — one mapping must satisfy all of them. `ServiceProtocolEnum` members are now `TCP`/`UDP`/`SCTP` (were `ROLE_TCP` etc.). Select `port_mappings` rather than the deprecated `protocol`/`ports` output fields (removed in 5.0).
+
+```graphql
+query {
+  service_list(filters: {protocol: [TCP], port__gte: [8000], port__lte: [8999]}, pagination: {limit: 100}) {
+    name
+    port_mappings
+  }
+}
+```
+
+## Custom Fields
+
+`custom_fields` resolves as a JSON scalar — request it as a leaf field with no sub-selection.
+
+> **NetBox 4.7+**: selection and multi-selection values inside it are `{"value": ..., "label": ...}` objects (a list of them for multi-select), matching REST. Read `custom_fields["environment"]["value"]`; on 4.5–4.6 the same key is the bare string. Unwrap defensively when one client spans both lines.
+
 ## The Query Optimizer
 
 The [netbox-graphql-query-optimizer](https://github.com/netboxlabs/netbox-graphql-query-optimizer) is essential for production GraphQL. It detects N+1 queries, unbounded lists, fan-out patterns, and depth violations.

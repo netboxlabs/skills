@@ -41,7 +41,17 @@ plugin (all other access uses standard NetBox model permissions).
 ## Merge and Revert Safety
 
 During branch merge/revert operations, protect_main is temporarily suspended
-to allow the merge writes to proceed normally.
+to allow the merge writes to proceed normally. Migrations are also exempt.
+
+## Background Bulk Requests (NetBox 4.7)
+
+`?background=true` defers a bulk REST write to a worker job. The worker rebuilds
+the request without `X-NetBox-Branch` (only host/forwarding headers survive), so
+the write executes with **no active branch**. With protect_main on, the job fails
+with `Changes directly to main are not permitted.` even though the original
+request returned 202; with protect_main off, the write lands in main. Either
+way: never use `?background=true` for work meant for a branch. Synchronous bulk
+writes with the branch header behave normally.
 
 ## Combined with Merge Gating
 

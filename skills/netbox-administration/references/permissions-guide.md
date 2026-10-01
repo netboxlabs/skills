@@ -80,13 +80,15 @@ Default value grants token self-management:
 - Header: `Authorization: Bearer nbt_<key>.<token>`
 - Requires `API_TOKEN_PEPPERS` in configuration
 - On **4.6.1+** the plaintext token is returned once, in the creation response — capture it then; it cannot be retrieved later
+- *(4.7+)* `token` is **read-only on REST create** — the client cannot supply its own plaintext; any value sent is ignored (the UI already behaved this way)
+- **4.7.0/4.7.1**: tokens created via a `?background=true` bulk request had their plaintext recorded in the job result, readable by anyone permitted to view jobs. 4.7.2 rejects such requests — treat tokens created that way as exposed and replace them
 
 ### Token Features
 
 | Field | Purpose |
 |-------|---------|
 | `enabled` | Soft disable without deleting |
-| `write_enabled` | `False` = read-only token |
+| `write_enabled` | `False` = read-only token. *(4.7)* Executing a custom script via the REST API also requires `True` |
 | `allowed_ips` | IP/subnet restriction list |
 | `expires` | Expiration datetime |
 | `description` | Human-friendly label |

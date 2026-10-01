@@ -127,6 +127,50 @@ Device.objects.exclude(role__name='patch-panel')
 Device.objects.filter(site=site).exclude(status='decommissioning').order_by('name')
 ```
 
+## Custom Field Data
+
+Inside a script, custom field values are read and written on `custom_field_data` as **raw stored values** on every NetBox version:
+
+```python
+device.custom_field_data['environment']          # 'prod'  (raw value, not {'value': ..., 'label': ...})
+device.snapshot()
+device.custom_field_data['environment'] = 'staging'
+device.full_clean()   # validates against the CustomField definition
+device.save()
+```
+
+> **NetBox 4.7+**: the REST and GraphQL APIs return selection / multi-selection values as `{"value": "prod", "label": "Production"}` objects. That is serialization only — the ORM value is still `'prod'`. If a script consumes API payloads (e.g. from a webhook or an HTTP call), unwrap `['value']` before comparing with ORM data.
+
+Enumerating the fields defined for a model:
+
+```python
+from extras.models import CustomField
+
+# 4.7+: returns a list of *active* CustomField objects (no queryset methods)
+# 4.5/4.6: returns a queryset
+fields = CustomField.objects.get_for_model(Device)
+required = [cf for cf in fields if cf.required]            # works on every version
+# NOT: CustomField.objects.get_for_model(Device).filter(required=True)  -> AttributeError on 4.7
+```
+
+`device.custom_fields` behaves the same way (list on 4.7). On 4.7 a field whose default is still being provisioned, or which is being deleted, by a background job (`status` = `provisioning` / `deleting`) is omitted from `get_for_model()` and from `custom_fields` until the job finishes; pass `statuses=` to `get_for_model()` to include them.
+
+## Hierarchical Models (Region, SiteGroup, Location, DeviceRole, Platform, TenantGroup, …)
+
+```python
+region = Region.objects.get(slug='americas')
+for child in region.get_children():        ...
+for r in region.get_descendants(include_self=True):   ...
+for r in region.get_ancestors():           ...
+depth = region.level                       # Python property on every version
+```
+
+> **NetBox 4.7+ (ltree)**: `level`, `lft`, `rght`, `tree_id` are no longer database columns — `Region.objects.filter(level=0)` and `.order_by('level')` raise `FieldError`. Use `parent__isnull=True` for roots and `get_ancestors()`/`get_descendants()`/`get_children()` for traversal. `get_root()`, `get_family()`, `is_leaf_node()`, `move_to()`, and `insert_at()` do not exist (reassign `parent` and `save()` to move a node; `not obj.get_children().exists()` for leaf checks). On 4.5/4.6 (django-mptt) the full MPTT API is available, but stick to the subset above so scripts survive the upgrade. After a bulk `COPY`/`UPDATE` that bypassed triggers, run `manage.py rebuild_ltree_paths --check`.
+
+## Search Index Lag (NetBox 4.7+)
+
+Global search index updates are deferred to a background job on 4.7. An object your script just created is immediately visible via the ORM and REST filters, but may not appear in the UI global search (`/search/?q=…`) for a short period. Do not write scripts that create an object and then locate it through the search index in the same run.
+
 ## User Context
 
 ```python

@@ -2,7 +2,9 @@
 
 Collection: `netbox.netbox` (GPLv3) — install via `ansible-galaxy collection install netbox.netbox`.
 
-**Requirements:** Python 3.11+, pynetbox, pytz, Ansible 2.18+. Supports the two most recent NetBox releases.
+**Requirements:** Python 3.11+, pynetbox, pytz, Ansible 2.18+. Policy: supports the two most recent NetBox releases.
+
+> **Version status (checked 2026-09-30):** the latest collection release is **v3.23.0** (2026-05-12), whose CI matrix runs through NetBox **4.5**. No release yet declares 4.6 or 4.7 support. Modules mostly pass fields straight through the REST API, so most tasks work on 4.7, but test in staging before upgrading NetBox and watch the 4.7 deltas below.
 
 ---
 
@@ -107,7 +109,7 @@ device_query_filters:
 
 ### Performance Tips
 
-1. **Set `config_context: false`** — Config context fetching adds a separate API call per device. Only enable if your playbooks consume config context data.
+1. **Set `config_context: false`** unless playbooks consume it — it keeps `config_context` out of hostvars. On **4.5/4.6** this also sends `?exclude=config_context`, sparing NetBox an expensive per-device render. On **4.7+** that parameter is silently ignored (context is pre-rendered/cached and always in the payload), so the server-side saving is gone; the option now only trims hostvars and response size.
 
 2. **Use `query_filters`** — Filter server-side to avoid fetching thousands of devices you don't need.
 
@@ -155,12 +157,17 @@ Use `nb_lookup` for ad-hoc queries when the inventory plugin doesn't provide the
 
 2. **Token permissions**: Module tasks that create/update objects need a write-capable token. Inventory and lookup only need read access. Use separate tokens with minimal scope.
 
-3. **Large inventories are slow**: The inventory plugin generates many host variables per device. For inventories with thousands of devices, `config_context: false` and tight `query_filters` are essential.
+3. **Large inventories are slow**: The inventory plugin generates many host variables per device. For inventories with thousands of devices, tight `query_filters` are essential; `config_context: false` helps most on 4.5/4.6 (see Performance Tips).
 
 4. **Collection version pinning**: Pin the collection version in `requirements.yml` to avoid breaking changes:
    ```yaml
    collections:
      - name: netbox.netbox
-       version: ">=3.20.0,<4.0.0"   # example — verify against the release that supports your NetBox 4.5/4.6
+       version: ">=3.23.0,<4.0.0"   # example — verify against the release that supports your NetBox 4.5–4.7
    ```
-   The literal above is illustrative. The `netbox.netbox` collection supports the two most recent NetBox releases, so confirm the version (and its NetBox support matrix) for your target 4.5/4.6 minor rather than copying a fixed pin.
+   The literal above is illustrative. Confirm the collection's NetBox support matrix (its CHANGELOG lists the CI matrix per release) for your target minor rather than copying a fixed pin.
+
+5. **NetBox 4.7 field changes** the collection has not yet caught up with:
+   - **Services**: `netbox_service` writes `protocol` + `ports`. NetBox 4.7 accepts that pair on write (translated to `port_mappings`) but returns `protocol`/`ports` as `null` for multi-protocol services, so idempotency checks on services created with `port_mappings` elsewhere may show perpetual "changed". Both legacy fields are removed in NetBox 5.0.
+   - **Selection custom fields**: on 4.7 the REST API returns selection/multi-selection values as `{"value": ..., "label": ...}` objects. `nb_lookup` results and `nb_inventory` hostvars (`custom_fields.<name>`) carry that object — compare `custom_fields.env.value`, not `custom_fields.env`. Writes still accept the raw value.
+   - **Config context**: always present in device/VM responses (see Performance Tips).

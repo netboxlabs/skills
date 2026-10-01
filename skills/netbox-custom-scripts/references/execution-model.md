@@ -9,7 +9,7 @@ Scripts execute as background jobs via Django-RQ (Redis Queue):
 3. Job is queued to Redis
 4. RQ worker picks it up and executes
 5. All execution is wrapped in `transaction.atomic()`
-6. On completion, job status is updated and notifications sent — **except** for scripts running in the background on NetBox **4.6+**, where completion notifications are disabled (poll job status instead). 4.6.2 also prevents duplicate scheduled background jobs.
+6. On completion, job status is updated. On NetBox **4.6+** whether the job's user is notified follows the run's `notifications` parameter (`always` / `on_failure` / `never`, defaulted by `Meta.notifications_default`) — poll job status rather than relying on a notification. 4.6.2 also prevents duplicate scheduled background jobs. On **4.7+** the job records `execution_time` (`completed - started`).
 
 ## Job Lifecycle States
 
@@ -72,9 +72,17 @@ Authorization: Bearer nbt_abc123.xxxxxxxx
 {
     "data": {"site": 1, "new_status": "active"},
     "commit": true,
-    "schedule_at": "2026-01-15T03:00:00Z"
+    "schedule_at": "2026-01-15T03:00:00Z",
+    "notifications": "on_failure"
 }
 ```
+
+- Identify the script by numeric ID or `module.ClassName` (e.g. `/api/extras/scripts/my_scripts.BulkUpdate/`). Requires the `extras.run_script` permission plus at least one running RQ worker.
+- `data` values for `ObjectVar`/`MultiObjectVar` are **object IDs** (`"site": 1`, `"devices": [1, 2]`), never nested objects.
+- **NetBox 4.7+**: the token must have **write enabled** — a read-only token gets HTTP 403 (`"This token does not permit write operations (running a script)."`). 4.6.8+ already enforced object permissions on script write operations via REST.
+- **NetBox 4.7.1+**: `data` is validated against the script's declared variables before enqueueing — missing required or invalid values return HTTP 400 with errors nested under `data`; undeclared keys are discarded; object IDs are resolved to instances. Earlier releases passed the payload through largely unvalidated, so clients that relied on extra keys reaching `run()` must be fixed.
+- `notifications` (4.6+): `always` / `on_failure` / `never`; defaults to `Meta.notifications_default`.
+- Scripts declaring a `FileVar` must be run with `multipart/form-data`, sending `data` as a JSON string alongside the file.
 
 ### CLI Execution
 
@@ -128,3 +136,6 @@ Job results are stored in the `Job` model:
 - `data['log']` — List of log entries (message, level, object, URL, timestamp)
 - `data['output']` — Return value from `run()` (displayed in Output tab)
 - `data['tests']` — Test method results (for validation report pattern)
+- `execution_time` *(4.7+)* — read-only duration (`completed - started`), exposed on `GET /api/core/jobs/<id>/`; use it to spot scripts drifting toward `job_timeout`
+
+The run `POST` returns the script's detail representation whose `result` key is the newly enqueued job (`id`, `status`, `url`). Poll `GET /api/core/jobs/<id>/` until `status.value` is `completed`, `errored`, or `failed`.

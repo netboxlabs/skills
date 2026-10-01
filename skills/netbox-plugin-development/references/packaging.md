@@ -15,7 +15,7 @@ readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12"
 authors = [{name = "Your Name", email = "you@example.com"}]
-dependencies = []
+dependencies = []    # your plugin's own deps only — never "netbox" (see below)
 
 [project.urls]
 Homepage = "https://github.com/yourname/netbox-myplugin"
@@ -31,6 +31,11 @@ version = {attr = "netbox_myplugin.version.__version__"}
 [tool.setuptools.packages.find]
 include = ["netbox_myplugin*"]
 ```
+
+NetBox has been published to PyPI since 4.7, so a `netbox` entry in `dependencies` makes
+`pip install netbox-myplugin` pull a second NetBox into the venv next to the real installation.
+Declare NetBox compatibility with `min_version`/`max_version` on `PluginConfig` instead, and add
+a `COMPATIBILITY.md` table (plugin release → min/max NetBox) for users planning upgrades.
 
 ## Version Management
 
@@ -67,9 +72,10 @@ max_version = '4.7.99'    # span 4.5–4.7; use .99 to allow all patch releases
 **Versioning guidelines:**
 - Use `.99` for max_version — `'4.5.0'` would block `4.5.1`!
 - Test against min and max versions in CI
-- Bump `min_version` when you use features from a newer release — e.g. `'4.6.0'` if you use declarative UI layouts or `Meta.permissions` custom actions
+- Bump `min_version` when you use features from a newer release — e.g. `'4.6.0'` for declarative UI layouts or `Meta.permissions` custom actions; `'4.7.0'` for GraphQL core-type extensions, `EventRuleAction`, Jinja filters/context, breadcrumbs, or `GenericObjectChoiceField`; `'4.7.1'` for `NestedLtreeGroupModel`
 - NetBox refuses to load plugins outside the declared version range
-- Remember the Django split when spanning 4.5–4.6: 4.5 is Django 5.2, 4.6 is Django 6.0
+- Remember the Django split when spanning 4.5–4.7: 4.5 is Django 5.2, 4.6 is Django 6.0, 4.7 is Django 6.1 — third-party deps must support all three
+- Spanning 4.6 and 4.7? Work through [netbox-4.7-migration](netbox-4.7-migration.md) first: several 4.6 deprecations were removed in 4.7
 
 ## Building & Publishing
 
@@ -143,7 +149,8 @@ strategy:
     python-version: ['3.12', '3.13', '3.14']
 ```
 
-Clone NetBox at the target version, install your plugin, run tests:
+Clone NetBox at the target version, install your plugin, run tests (the 4.7.x job needs a
+PostgreSQL 15+ service; 4.5/4.6 accept 14):
 
 ```bash
 git clone --depth 1 --branch v$NETBOX_VERSION https://github.com/netbox-community/netbox.git
