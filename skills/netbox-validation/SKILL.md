@@ -89,6 +89,8 @@ All three can coexist in a single policy. Config and graph engines are available
 
 Since plugin 1.12.0 each run is linked to its NetBox background job, bounded by a job timeout, and orphaned runs (worker lost mid-run) are reaped rather than left in `running`.
 
+Each run exposes `job_id` (the core background Job). The plugin settings `job_timeout` (default 3600s) and `run_retention_days` (default 180; `<= 0` disables) govern this: completed runs older than the window are pruned by the hourly housekeeping job, which never prunes in-flight runs and always keeps each policy's most recent run. Bulk cleanup from an agent should prefer the MCP `prune_validation_runs` tool (dry-run by default) over looping `DELETE /runs/{id}/`.
+
 ### Result Statuses
 
 Each per-device, per-check result: `pass`, `fail`, `skip`, `warning`, or `error`.
@@ -261,7 +263,7 @@ Installed packs create regular policies and rules. After installation, customize
 
 ### Delete Rules and Policies
 
-Since plugin 1.13.0, `DELETE /rules/{id}/` and `DELETE /policies/{id}/` preserve historical run results — prior runs keep the rule's name and outcome, shown as "(deleted rule)". Policy-pack uninstall is still refused while runs reference the pack's policy; delete the policy directly if you need it gone.
+Since plugin 1.13.0, `DELETE /rules/{id}/` and `DELETE /policies/{id}/` preserve historical run results. Results keep `rule_name` and `check_name` snapshots (the rule's parameters are kept in `extra.rule_parameters`), and runs and compliance scores keep `policy_name`; after a deletion the `rule` / `policy` FK fields are `null`, so read the `*_name` fields rather than assuming the FK is set. Policy-pack uninstall is no longer refused when runs exist — the pack's policies are removed and their run history is retained under the snapshotted policy name. Deleting a **run** (`DELETE /runs/{id}/`) is the one destructive path: it cascades the run's results, findings and compliance scores.
 
 ### Clone and Import
 
@@ -439,7 +441,7 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/rules/` | GET, POST | List and create rules |
 | `/rules/{id}/` | GET, PUT, PATCH, DELETE | Manage a rule |
 | `/runs/` | GET, POST | List and create runs |
-| `/runs/{id}/` | GET | Run status and summary |
+| `/runs/{id}/` | GET, DELETE | Run status and summary; DELETE removes the run and cascades its results, findings and scores |
 | `/runs/{id}/execute/` | POST | Execute a pending run |
 | `/runs/validate-device/` | POST | Run all matching policies for a device |
 | `/results/` | GET | Results (filter by run, device, status) |
@@ -448,6 +450,11 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/findings/summary/` | GET | Finding counts by status, severity, category (respects filters) |
 | `/findings/bulk-update-status/` | POST | `{"ids": [...], "status": "..."}` — bulk status change |
 | `/compliance/` | GET | Compliance scores (filter by device, policy) |
+| `/compliance/summary/` | GET | Fleet score, device count, finding counts |
+| `/compliance/trend/?days=N` | GET | Daily compliance scores over time |
+| `/compliance/breakdown/?group_by=site\|role\|policy` | GET | Scores grouped by dimension (deleted policies keep their history under the snapshotted name) |
+| `/compliance/distribution/` | GET | Histogram of device compliance scores |
+| `/compliance/worst-performers/?limit=N` | GET | Lowest-scoring devices |
 | `/policy-packs/` | GET | List available policy packs |
 | `/policy-packs/{slug}/` | GET | Pack details with rule list |
 | `/policy-packs/{slug}/install/` | POST | Install a pack |
