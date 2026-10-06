@@ -69,6 +69,17 @@ curl "$NETBOX_URL/api/plugins/validation/runs/?policy_id=1&ordering=-created" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
 
+## Run History and Retention
+
+```bash
+# Delete a run — cascades its results, findings and compliance scores (plugin 1.13+)
+curl -X DELETE "$NETBOX_URL/api/plugins/validation/runs/1/" -H "Authorization: Bearer $NETBOX_TOKEN"
+```
+
+- Deleting a rule or policy never removes history (see Rule Management above). Results carry `rule_name` / `check_name`; runs and scores carry `policy_name`; the `rule` / `policy` FKs are `null` after deletion.
+- Completed runs are pruned after `run_retention_days` (plugin setting, default 180). In-flight runs are never pruned and each policy's most recent run is always kept.
+- Each run carries `job_id`. A run left in `running` by a worker crash is reconciled to `error` by the hourly housekeeping job; `job_timeout` (default 3600s) bounds a hung run.
+
 ## Targeted Runs
 
 ```bash
