@@ -8,7 +8,7 @@ All endpoints under `/api/plugins/validation/`. Auth: `Authorization: Bearer <to
 # List policies
 curl "$NETBOX_URL/api/plugins/validation/policies/" -H "Authorization: Bearer $NETBOX_TOKEN"
 
-# Create a policy
+# Create a policy (config engine on, default config source = Config Templates)
 curl -X POST "$NETBOX_URL/api/plugins/validation/policies/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"name": "Leaf Baseline", "is_active": true, "enable_config_engine": true,
@@ -34,12 +34,25 @@ curl -X POST "$NETBOX_URL/api/plugins/validation/policies/1/clone/" \
 curl "$NETBOX_URL/api/plugins/validation/rules/?policy_id=1" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 
-# Create a rule
+# Create an intent rule
 curl -X POST "$NETBOX_URL/api/plugins/validation/rules/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"policy": 1, "name": "Minimum Uplinks", "engine": "intent",
     "category": "redundancy", "check_name": "min_cabled_uplinks",
     "severity": "critical", "is_active": true, "parameters": {"min_uplinks": 4}}'
+
+# Create a config rule (text primitive) — look up parameters first: GET /checks/config_each_block/
+curl -X POST "$NETBOX_URL/api/plugins/validation/rules/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"policy": 1, "name": "VTY SSH only", "engine": "config", "category": "security",
+    "check_name": "config_each_block", "severity": "critical",
+    "parameters": {"block": "^line vty", "require": ["^transport input ssh$", "^access-class \\S+ in"], "forbid": ["telnet"]}}'
+
+# Create a config rule (hardening control, no parameters)
+curl -X POST "$NETBOX_URL/api/plugins/validation/rules/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"policy": 1, "name": "SSH v2", "engine": "config", "category": "security",
+    "check_name": "ssh_version_2", "severity": "high"}'
 
 # Update a rule
 curl -X PATCH "$NETBOX_URL/api/plugins/validation/rules/5/" \
@@ -50,6 +63,58 @@ curl -X PATCH "$NETBOX_URL/api/plugins/validation/rules/5/" \
 curl -X DELETE "$NETBOX_URL/api/plugins/validation/rules/5/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
+
+## Check Catalog
+
+```bash
+# Every built-in check across the three engines
+curl "$NETBOX_URL/api/plugins/validation/checks/" -H "Authorization: Bearer $NETBOX_TOKEN"
+
+# Config text-layer checks only / hardening controls only / checks valid for a family
+curl "$NETBOX_URL/api/plugins/validation/checks/?engine=config&layer=text" -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/checks/?group=Hardening" -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/checks/?engine=config&family=junos" -H "Authorization: Bearer $NETBOX_TOKEN"
+
+# One check: parameters schema, default_params, families, sources, requires_proposed, framework_refs
+curl "$NETBOX_URL/api/plugins/validation/checks/vty_exec_timeout/" -H "Authorization: Bearer $NETBOX_TOKEN"
+```
+
+Filters: `engine`, `layer` (`text` | `model`), `group`, `category`, `family`. Response: `{"count": N, "results": [...]}`.
+
+## Configuration Compliance
+
+```bash
+# Point a policy at intended configuration files in a NetBox Data Source (one file per device)
+curl -X PATCH "$NETBOX_URL/api/plugins/validation/policies/12/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"config_source": "datasource", "config_data_source": 3,
+       "config_path_template": "{{ device.site.slug }}/{{ device.name }}.cfg"}'
+
+# Back to rendered Config Templates (default)
+curl -X PATCH "$NETBOX_URL/api/plugins/validation/policies/12/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"config_source": "template"}'
+
+# Evaluate configuration text inline (CI pipeline, partner tooling). Keys = device names or IDs.
+curl -X POST "$NETBOX_URL/api/plugins/validation/policies/12/evaluate/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"configs": {"leaf1": "hostname leaf1\n...", "42": "hostname leaf2\n..."},
+       "wait": true, "origin": "ci:build-123"}'
+# wait=true  -> 200 {"run": {...}, "results": [...]}
+# wait=false -> 202 run (poll GET /runs/{id}/)
+
+# Provenance and coverage for a run
+curl "$NETBOX_URL/api/plugins/validation/runs/920/coverage/" -H "Authorization: Bearer $NETBOX_TOKEN"
+
+# Device x check status matrix (optionally one engine)
+curl "$NETBOX_URL/api/plugins/validation/runs/920/matrix/?engine=config" -H "Authorization: Bearer $NETBOX_TOKEN"
+```
+
+- Policies expose `config_source` (`template` | `datasource`), `config_data_source`, `config_data_source_name`, `config_path_template`.
+- Runs expose `config_source` (adds `inline` for evaluate runs), `config_provenance`, `skipped_checks`.
+- Results carry `expected`, `actual`, `remediation` and `extra` with `layer`, `family`, `source` and check-specific detail (`missing`, `extra`, `violations`, `mismatches`, `conditions`, `reason` on skips).
+
+See [config-compliance.md](config-compliance.md) for response shapes and rule-writing guidance.
 
 ## Run Lifecycle
 
@@ -114,19 +179,22 @@ curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"policy": 1, "trigger": "manual", "branch_id": 5}'
 # Then execute as normal. Rules read from main; checks run in branch context.
+# With the Config Templates source, the proposed configuration is rendered from the branch.
 ```
 
 ## Results and Findings
 
 ```bash
-# Results: filter by run, device, status, check_name
+# Results: filter by run, device, status, check_name, rule_name, device_name
 curl "$NETBOX_URL/api/plugins/validation/results/?run_id=1" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 curl "$NETBOX_URL/api/plugins/validation/results/?status=fail&device_id=10" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/results/?run_id=1&check_name=ssh_version_2" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
 
-# Findings: filter by severity, status, run
-curl "$NETBOX_URL/api/plugins/validation/findings/?severity=critical&status=open" \
+# Findings: filter by severity, status, run, category, site, role; latest=true for current findings only
+curl "$NETBOX_URL/api/plugins/validation/findings/?latest=true&severity=critical&status=open" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 
 # Update finding status
@@ -142,7 +210,7 @@ curl "$NETBOX_URL/api/plugins/validation/findings/summary/?status=open" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
 
-Remediating a finding means writing to core NetBox objects — on NetBox **4.7** selection custom fields read back as `{"value", "label"}` (write the raw value), services take `port_mappings`, and failed bulk writes report per-object errors by `index`. See [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+Remediating a finding means writing to core NetBox objects — on NetBox **4.7** selection custom fields read back as `{"value", "label"}` (write the raw value), services take `port_mappings`, and failed bulk writes report per-object errors by `index`. See [netbox-api-integration](../../netbox-api-integration/SKILL.md). Remediating a **compliance finding** means changing the intended configuration — the Config Template, config context, or the file in the Data Source — then re-running.
 
 ## Compliance Scores
 
@@ -161,11 +229,11 @@ curl "$NETBOX_URL/api/plugins/validation/compliance/?policy_id=1" \
 # List / details / install / uninstall
 curl "$NETBOX_URL/api/plugins/validation/policy-packs/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
-curl "$NETBOX_URL/api/plugins/validation/policy-packs/addressing-ipam/" \
+curl "$NETBOX_URL/api/plugins/validation/policy-packs/management-plane-security/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
-curl -X POST "$NETBOX_URL/api/plugins/validation/policy-packs/addressing-ipam/install/" \
+curl -X POST "$NETBOX_URL/api/plugins/validation/policy-packs/management-plane-security/install/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
-curl -X POST "$NETBOX_URL/api/plugins/validation/policy-packs/addressing-ipam/uninstall/" \
+curl -X POST "$NETBOX_URL/api/plugins/validation/policy-packs/management-plane-security/uninstall/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
 
@@ -187,10 +255,12 @@ curl -X POST "$NETBOX_URL/api/plugins/validation/policies/import/" \
 ### YAML Format
 
 ```yaml
-name: Leaf Intent Baseline
-description: Standard intent validation for leaf switches
-enable_config_engine: false
+name: Leaf Baseline
+description: Intent + configuration compliance for leaf switches
+enable_config_engine: true
 enable_graph_engine: false
+config_source: template          # or datasource (then PATCH config_data_source after import)
+config_path_template: "{{ device.name }}.cfg"
 trigger_on_cr_submit: true
 schedule: "0 2 * * *"
 rules:
@@ -206,4 +276,20 @@ rules:
     severity: critical
     parameters:
       min_uplinks: 2
+  - name: SSH Version 2 Only
+    engine: config
+    category: security
+    check_name: ssh_version_2
+    severity: high
+  - name: NTP servers from config context
+    engine: config
+    category: standards
+    check_name: config_value
+    severity: medium
+    parameters:
+      pattern: '^ntp server (\S+)'
+      op: superset_of
+      value_from: "config_context:ntp.servers"
 ```
+
+Export carries `config_source` and `config_path_template` but not `config_data_source` (environment-specific ID).
