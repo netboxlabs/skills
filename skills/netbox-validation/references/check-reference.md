@@ -1,6 +1,6 @@
-# Check Reference — All 202 Built-in Checks
+# Check Reference — All 218 Built-in Checks
 
-44 intent, 142 config (9 text primitives, 82 hardening controls, 17 source-of-truth parity, 34 model-layer), 16 graph. Parameters below are a summary; the authoritative schema, defaults, supported families and framework references for any check come from `GET /api/plugins/validation/checks/{name}/` — read it before writing a rule.
+44 intent, 158 config (9 text primitives, 84 hardening controls, 24 source-of-truth parity, 41 model-layer), 16 graph. Parameters below are a summary; the authoritative schema, defaults, supported families and framework references for any check come from `GET /api/plugins/validation/checks/{name}/` — read it before writing a rule.
 
 Checks evaluate NetBox data or intended configuration server-side; parameters are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` always present) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
 
@@ -80,7 +80,7 @@ Checks evaluate NetBox data or intended configuration server-side; parameters ar
 | `secure_protocols_enforced` | No cleartext mgmt protocols (Telnet/HTTP/SNMPv1-2c/FTP) in config context | `insecure_keys`, `required_keys` |
 | `ephi_zone_segmentation` | Sensitive-zone prefixes isolated in a dedicated VRF | `zones` |
 
-## Config Checks (142)
+## Config Checks (158)
 
 *Premium tier. Requires `enable_config_engine: true` and a config source on the policy. Every result records `extra.layer` (`text` or `model`), `extra.family` and `extra.source`. See [config-compliance.md](config-compliance.md) for rule-writing guidance, result semantics and the skip reasons.*
 
@@ -88,27 +88,27 @@ Checks evaluate NetBox data or intended configuration server-side; parameters ar
 
 | Check | Description | Parameters (defaults) |
 |-------|-------------|------------|
-| `config_contains` | Required lines/patterns present | `lines: []`, `regex: []`, `section`, `match: all`, `match_mode: exact`, `ignore_case: false` |
-| `config_not_contains` | Forbidden lines/patterns absent | `lines: []`, `regex: []`, `section`, `match_mode: exact`, `ignore_case: false` |
+| `config_contains` | Required lines/patterns present | `lines: []`, `regex: []`, `section`, `section_depth: top` (`top\|any`), `match: all`, `match_mode: exact`, `ignore_case: false` |
+| `config_not_contains` | Forbidden lines/patterns absent | `lines: []`, `regex: []`, `section`, `section_depth: top`, `match_mode: exact`, `ignore_case: false` |
 | `config_section_present` | Top-level section exists | `section`, `match: all` |
 | `config_section_absent` | Top-level section does not exist | `section` |
-| `config_each_block` | Every block matching `block` satisfies require/forbid | `block`, `depth: 0`, `exclude`, `when`, `require: []`, `require_lines: []`, `forbid: []`, `forbid_lines: []`, `allow_empty: false`, `min_blocks: 0` |
-| `config_value` | Capture a value and compare | `pattern`, `op: eq` (`eq\|ne\|lt\|le\|gt\|ge\|in\|not_in\|subset_of\|superset_of\|count_ge\|count_le\|regex`), `value`, `value_from: literal` (`config_context:<path>`, `netbox:<key>`), `section`, `group: 1`, `require_match: true`, `all: true` |
+| `config_each_block` | Every block matching `block` satisfies require/forbid; passes with "No matching blocks to evaluate" when none match unless `min_blocks` is set | `block`, `depth: 0`, `exclude`, `when`, `require: []`, `require_lines: []`, `forbid: []`, `forbid_lines: []`, `allow_empty: false`, `min_blocks: 0` |
+| `config_value` | Capture a value and compare (block bodies are indentation-stripped: `^exec-timeout`, not `^ exec-timeout`) | `pattern`, `op: eq` (`eq\|ne\|lt\|le\|gt\|ge\|in\|not_in\|subset_of\|superset_of\|count_ge\|count_le\|regex`), `value`, `value_from: literal` (`config_context:<path>`, `netbox:<key>`), `section`, `section_depth: top`, `group: 1`, `require_match: true`, `all: true` |
 | `config_section_allowlist` | Everything in a section matches an allowlist | `section`, `allow: []`, `allow_lines: []`, `include_head: false` |
 | `config_banner_contains` | Banner exists and contains phrases | `banner: any`, `phrases: []`, `ignore_case: true`, `min_length: 0` |
 | `config_unparsed_lines` | Coverage: significant lines no rule evaluated | `max_lines: 0`, `max_percent`, `ignore: []` |
 
-### Hardening Controls (82) — text layer, per-family pattern tables
+### Hardening Controls (84) — text layer, per-family pattern tables
 
-Vendor-neutral control names; the device's family selects the syntax. Most take no parameters. Each carries `framework_refs` (`cis_ios_xe`, `cis_nxos`, `cis_junos`, `stig`, `nsa_2022`, `pci_dss_4`, `nist_800_53`). Pattern tables are per family and still expanding; a control with no pattern for the device's family returns `skip` ("no pattern for family"), never `fail` — check `families` on `GET /checks/{name}/`. Full metadata: `GET /checks/?group=Hardening`.
+Vendor-neutral control names; the device's family selects the syntax. Most take no parameters. Each carries a top-level `plane` (`management` | `control` | `data`), `framework_refs` (`cis_ios_xe`, `cis_nxos`, `cis_junos`, `stig`, `nsa_2022`, `pci_dss_4`, `nist_800_53`) and `families` populated from the pattern tables (e.g. `vtp_transparent_or_off` → `["ios", "nxos"]`). Pattern tables are per family and still expanding; on a family absent from `families` the control returns `skip` with `extra.reason` "not applicable" (message explains why) or "no pattern for family" — never `fail`. Pre-flight against `GET /checks/{name}/`. Full metadata: `GET /checks/?group=Hardening`.
 
-**Management plane (38)** — `aaa_enabled`, `aaa_login_authentication_configured`, `aaa_accounting_enabled`, `local_fallback_user_exists`, `enable_secret_configured`, `password_encryption_enabled`, `local_users_use_secret`, `password_policy_min_length` (`min_length: 15`), `login_lockout_configured`, `ssh_version_2`, `ssh_timeout_and_retries` (`max_timeout: 60`, `max_retries: 3`), `ssh_key_strength` (`min_modulus: 2048`), `telnet_disabled`, `http_server_disabled`, `https_only_management`, `vty_access_class_configured`, `vty_exec_timeout` (`max_minutes: 10`), `console_exec_timeout` (`max_minutes: 10`), `aux_port_disabled`, `login_banner_configured` (`phrases: []`), `motd_banner_configured` (`phrases: []`), `snmp_no_default_communities`, `snmp_v3_priv_required`, `snmp_community_acl_configured`, `snmp_read_only`, `snmp_trap_hosts_configured` (`min_hosts: 1`), `logging_hosts_min_count` (`min_hosts: 2`), `logging_buffered_configured`, `logging_timestamps_enabled`, `logging_source_interface_configured`, `logging_level_minimum` (`level: informational`), `ntp_servers_min_count` (`min_servers: 2`), `ntp_authentication_enabled`, `ntp_source_interface_configured`, `single_management_loopback`, `management_not_on_vlan1`, `config_archive_enabled`, `fips_algorithms_only`
+**Management plane (39)** — `aaa_enabled`, `aaa_login_authentication_configured`, `aaa_accounting_enabled`, `local_fallback_user_exists`, `local_accounts_least_privilege`, `enable_secret_configured`, `password_encryption_enabled`, `local_users_use_secret`, `password_policy_min_length` (`min_length: 15`), `login_lockout_configured` (`max_attempts: 5`, `min_block_seconds: 60`), `ssh_version_2`, `ssh_timeout_and_retries` (`max_timeout: 60`, `max_retries: 3`), `ssh_key_strength` (`min_modulus: 2048`), `telnet_disabled`, `http_server_disabled`, `https_only_management`, `vty_access_class_configured`, `vty_exec_timeout` (`max_minutes: 10`), `console_exec_timeout` (`max_minutes: 10`), `aux_port_disabled`, `login_banner_configured` (`phrases: []`), `motd_banner_configured` (`phrases: []`), `snmp_no_default_communities`, `snmp_v3_priv_required`, `snmp_community_acl_configured`, `snmp_read_only`, `snmp_trap_hosts_configured` (`min_hosts: 1`), `logging_hosts_min_count` (`min_hosts: 2`), `logging_buffered_configured`, `logging_timestamps_enabled`, `logging_source_interface_configured`, `logging_level_minimum` (`level: informational`), `ntp_servers_min_count` (`min_servers: 2`), `ntp_authentication_enabled`, `ntp_source_interface_configured`, `single_management_loopback`, `management_not_on_vlan1`, `config_archive_enabled`, `fips_algorithms_only`
 
-**Control plane (18)** — `cdp_disabled_on_edge` (`edge`, `edge_when`), `lldp_disabled_on_edge` (`edge`, `edge_when`), `bootp_server_disabled`, `dhcp_service_disabled`, `pad_service_disabled`, `tcp_keepalives_enabled`, `ip_source_route_disabled`, `copp_configured`, `ospf_authentication_configured`, `bgp_authentication_configured`, `eigrp_authentication_configured`, `isis_authentication_configured`, `bgp_ttl_security_configured`, `bgp_max_prefix_configured`, `bgp_prefix_filter_applied`, `bogon_prefix_filter_present`, `ospf_passive_default_on_edge`, `routing_key_lifetime_max_days` (`max_days: 180`)
+**Control plane (18)** — `cdp_disabled_on_edge` (`edge`, `edge_when`), `lldp_disabled_on_edge` (`edge`, `edge_when`), `bootp_server_disabled`, `dhcp_service_disabled`, `pad_service_disabled`, `tcp_keepalives_enabled`, `ip_source_route_disabled`, `copp_configured`, `ospf_authentication_configured`, `bgp_authentication_configured`, `eigrp_authentication_configured`, `isis_authentication_configured`, `bgp_ttl_security_configured`, `bgp_max_prefix_configured`, `bgp_prefix_filter_applied`, `bogon_prefix_filter_present`, `ospf_passive_default_on_edge`, `routing_key_lifetime_max_days` (`max_days: 180`, `require_lifetimes: true`)
 
-**Data plane (26)** — `proxy_arp_disabled`, `directed_broadcast_disabled`, `icmp_redirects_disabled`, `icmp_unreachables_disabled_external` (`external`, `external_when`), `urpf_enabled_on_edge` (`edge`, `edge_when`), `antispoof_acl_on_external` (`external`, `external_when`), `acl_denies_private_from_external`, `acl_explicit_deny_log` (`exclude`), `acl_no_permit_any_any`, `no_tunnel_interfaces`, `unused_ports_shutdown` (`unused_when`), `unused_ports_in_parking_vlan` (`vlan: 999`), `no_vlan1_on_access_ports` (`access_when`), `native_vlan_not_1`, `trunks_explicit_allowed_vlans`, `bpduguard_on_access_ports` (`access_when`), `rootguard_on_designated_ports`, `loopguard_or_udld_enabled`, `dhcp_snooping_enabled`, `dynamic_arp_inspection_enabled`, `ip_source_guard_enabled` (`access_when`), `port_security_on_access_ports` (`access_when`), `storm_control_on_access_ports` (`access_when`), `dot1x_on_access_ports` (`access_when`), `vtp_transparent_or_off`, `igmp_snooping_enabled`
+**Data plane (27)** — `proxy_arp_disabled`, `directed_broadcast_disabled`, `icmp_redirects_disabled`, `icmp_unreachables_disabled_external` (`external`, `external_when`), `urpf_enabled_on_edge` (`edge`, `edge_when`), `antispoof_acl_on_external` (`external`, `external_when`), `acl_denies_private_from_external`, `acl_explicit_deny_log` (`exclude`), `acl_no_permit_any_any`, `no_tunnel_interfaces`, `unused_ports_shutdown` (`unused_when`), `unused_ports_in_parking_vlan` (`vlan: 999`), `no_vlan1_on_access_ports` (`access_when`), `native_vlan_not_1`, `vlan1_pruned_from_trunks`, `trunks_explicit_allowed_vlans`, `bpduguard_on_access_ports` (`access_when`), `rootguard_on_designated_ports`, `loopguard_or_udld_enabled`, `dhcp_snooping_enabled`, `dynamic_arp_inspection_enabled`, `ip_source_guard_enabled` (`access_when`), `port_security_on_access_ports` (`access_when`), `storm_control_on_access_ports` (`access_when`), `dot1x_on_access_ports` (`access_when`), `vtp_transparent_or_off`, `igmp_snooping_enabled`
 
-### Source-of-Truth Parity (17) — `expected` = NetBox, `actual` = configuration
+### Source-of-Truth Parity (24) — `expected` = NetBox, `actual` = configuration
 
 | Check | Layer | Description | Parameters |
 |-------|-------|-------------|------------|
@@ -120,19 +120,26 @@ Vendor-neutral control names; the device's family selects the syntax. Most take 
 | `interface_vrf_matches_netbox` | model | Interface VRF membership matches | -- |
 | `interface_switchport_matches_netbox` | model | Access/trunk mode and VLANs match | -- |
 | `lag_membership_matches_netbox` | model | Channel-group membership matches LAG parents | -- |
+| `netbox_interfaces_present_in_config` | model | Every NetBox interface (excluding virtual/LAG/other and mgmt-only by default) exists in the configuration | `ignore_types: [virtual, lag, other]`, `ignore_mgmt_only: true` |
+| `config_interfaces_present_in_netbox` | model | Every configured interface is documented in NetBox | `ignore_regex` |
+| `cabled_interfaces_enabled` | model | Interfaces with a cable in NetBox are not shut down | -- |
+| `uncabled_interfaces_shutdown` | model | Physical interfaces without a cable are administratively down | -- |
 | `vrfs_match_netbox` | model | Device VRFs match NetBox | -- |
-| `vlans_match_netbox` | model | Device VLANs match site/group VLANs | -- |
+| `vlans_match_netbox` | model | Device VLANs vs site/group VLANs | `mode: subset` (no undocumented VLANs on the device) — also `superset` (every NetBox VLAN configured), `equal` |
 | `bgp_neighbors_match_netbox` | model | BGP peers match netbox-bgp sessions | -- |
 | `bgp_local_as_matches_netbox` | model | Local AS equals assigned ASN | -- |
-| `ntp_servers_match_context` | model | NTP servers equal config context list | `path: ntp.servers`, `mode: equal` |
-| `dns_servers_match_context` | model | DNS servers equal config context list | `path: dns.servers`, `mode: equal` |
-| `syslog_hosts_match_context` | model | Logging hosts equal config context list | `path: syslog.hosts`, `mode: equal` |
-| `aaa_servers_match_context` | model | TACACS/RADIUS servers equal config context | `tacacs_path: aaa.tacacs_servers`, `radius_path: aaa.radius_servers` |
-| `snmp_matches_context` | model | SNMP communities/trap hosts/location/contact match | `path: snmp` |
+| `router_id_is_loopback` | model | BGP/OSPF router-ids equal a loopback address documented in NetBox | -- |
+| `fhrp_matches_netbox` | model | HSRP/VRRP groups and priorities per interface match NetBox FHRP group assignments | -- |
+| `ospf_passive_interfaces_match_role` | model | Uncabled OSPF interfaces are passive, cabled links active | -- |
+| `ntp_servers_match_context` | model (text on fortios/panos/asa/aoscx) | NTP servers equal config context list | `path: ntp.servers`, `mode: equal` |
+| `dns_servers_match_context` | model (text on fortios/panos/asa/aoscx) | DNS servers equal config context list | `path: dns.servers`, `mode: equal` |
+| `syslog_hosts_match_context` | model (text on fortios/panos/asa/aoscx) | Logging hosts equal config context list | `path: syslog.hosts`, `mode: equal` |
+| `aaa_servers_match_context` | text | TACACS/RADIUS servers equal config context | `tacacs_path: aaa.tacacs_servers`, `radius_path: aaa.radius_servers`, `mode: equal` |
+| `snmp_matches_context` | text | SNMP communities/trap hosts/location/contact match | `path: snmp`, `mode: equal` |
 
-Model-layer checks run for `ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `fortios`, `asa` (skip on `aoscx`). `mode` accepts `equal`, `subset`, `superset`.
+Model-layer checks run for `ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `fortios`, `asa` (skip on `aoscx`); the three `ntp`/`dns`/`syslog` context checks fall back to the text layer on `fortios`, `panos`, `asa` and `aoscx`, and the `aaa`/`snmp` context checks are text-layer everywhere (so they do run on `aoscx`). `mode` accepts `equal`, `subset`, `superset`.
 
-### Model Layer (34) — analysis service
+### Model Layer (41) — analysis service
 
 | Check | Group | Scope | Description | Parameters |
 |-------|-------|-------|-------------|------------|
@@ -152,11 +159,14 @@ Model-layer checks run for `ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `for
 | `ospf_session_compatibility` | Routing | device | OSPF adjacencies compatible | -- |
 | `ospf_process_config` | Routing | device | Expected OSPF areas configured | `expected_areas: []` |
 | `no_duplicate_router_ids` | Routing | fleet | No two devices share a router-id | -- |
+| `route_policy_behaves` | Routing | fleet | Route policies permit/deny test routes as expected, with optional attribute checks | `cases: []` |
+| `vrf_route_leaking_as_designed` | Routing | fleet | Leaked prefixes present where designed and absent elsewhere | `leaks: []`, `forbid_other_vrfs: false` |
 | `duplicate_ips` | Addressing | fleet | Same IP owned by more than one interface | -- |
 | `ip_owners_conflict` | Addressing | fleet | Parser-native duplicate IP detection | -- |
 | `interface_mtu_config` | Topology | device | MTU matches on both ends of every L3 link | -- |
 | `layer3_topology_complete` | Topology | fleet | At least one L3 adjacency modelled | -- |
 | `hsrp_vrrp_config` | Redundancy | device | FHRP groups have an active router | -- |
+| `mlag_consistency` | Redundancy | fleet | Every MLAG domain has exactly two members | -- |
 | `vxlan_vni_config` | Overlay | device | VNIs have flood lists and local VTEP IPs | -- |
 | `evpn_l3_vni_consistency` | Overlay | fleet | Each VRF maps to exactly one L3 VNI | -- |
 | `routing_loop_detection` | Reachability | fleet | No forwarding loops | -- |
@@ -166,6 +176,10 @@ Model-layer checks run for `ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `for
 | `assert_traffic_blocked` | Reachability | fleet | Traffic src→dst denied or unrouted (segmentation) | `src_ip`, `dst_ip`, `protocol`, `dst_port` |
 | `acl_reachability` | Filters | device | No shadowed/unreachable filter lines | -- |
 | `acl_denies_traffic` | Filters | device | A filter denies the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port` |
+| `acl_unused` | Filters | device | ACLs, prefix lists, route maps and policies defined but never referenced (advisory) | `types_regex`, `ignore_regex` |
+| `filter_permits` | Filters | fleet | The selected filters permit the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port`, `filters`, `nodes` |
+| `filter_denies` | Filters | fleet | The selected filters deny the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port`, `filters`, `nodes` |
+| `named_structure_matches` | Filters | device | A named structure exists and contains expected fragments or equals an expected JSON definition | `structure_name`, `structure_type`, `nodes`, `expected_contains: []`, `expected_json` |
 | `snmp_community_clients` | Management | device | Clients permitted per SNMP community | `communities: []` |
 | `management_access_acl_configured` | Management | device | Legacy heuristic — prefer `vty_access_class_configured` | `management_subnets: []` |
 | `differential_reachability` | Pre-change | fleet | Flows that succeed today still succeed with proposed configs (branch only) | -- |

@@ -14,7 +14,7 @@ NetBox Validation continuously validates infrastructure against declarative poli
 
 > **Your knowledge of NetBox Validation may be outdated.** Check names, API fields, policy pack contents, and engine capabilities evolve between releases. Prefer retrieval over pre-trained knowledge — the check catalog (`GET /checks/`) is the source of truth for check names and parameters.
 
-**Current plugin:** 1.15.0 (configuration compliance: config sources, text rules, 82 hardening controls, source-of-truth parity, check catalog). NetBox 4.7 support arrived in 1.14.0; the plugin declares NetBox 4.4–4.7.x, and the docs require NetBox 4.5+ (NetBox Cloud). See [Version Notes](#version-notes).
+**Current plugin:** 1.15.0 (configuration compliance: config sources, text rules, 84 hardening controls, source-of-truth parity, check catalog). NetBox 4.7 support arrived in 1.14.0; the plugin declares NetBox 4.4–4.7.x, and the docs require NetBox 4.5+ (NetBox Cloud). See [Version Notes](#version-notes).
 
 ## Retrieval Sources
 
@@ -23,7 +23,7 @@ NetBox Validation continuously validates infrastructure against declarative poli
 | Validation docs | `https://netboxlabs.com/docs/validation/` | Full reference, engines, config sources, check catalog, policy packs |
 | Validation REST API | `https://netboxlabs.com/docs/validation/api-reference/` | Endpoint details |
 | Check catalog | `GET /api/plugins/validation/checks/` | Live check names, parameters, defaults, families, framework references |
-| NetBox Platform MCP | If configured — 10 validation tools | Run validation, evaluate configs, query compliance, browse checks |
+| NetBox Platform MCP | If configured — 11 validation tools | Run validation, evaluate configs, query compliance, browse checks, create rules |
 | NetBox MCP server | If configured — read-only access | Verify devices, policies, scores |
 
 ## FIRST: Verify Connectivity
@@ -67,14 +67,14 @@ Each rule specifies:
 | `severity` | `critical`, `high`, `medium`, `low`, or `info` |
 | `parameters` | Check-specific config (thresholds, patterns, expected values) — merged over the check's defaults |
 
-Rules can optionally override the policy scope with their own roles and platforms filters.
+Rules can optionally override the policy scope with their own `roles` and `platforms` filters (lists of IDs).
 
 ### Three Engines
 
 | Engine | Checks | Evaluates | Data Source | Key Strength |
 |--------|--------|-----------|-------------|--------------|
 | Intent | 44 | NetBox data relationships | NetBox ORM | Fast, no external dependencies |
-| Config | 142 | Intended configuration text | Config source (templates, Data Source, inline) | Configuration compliance, hardening, parity, reachability |
+| Config | 158 | Intended configuration text | Config source (templates, Data Source, inline) | Configuration compliance, hardening, parity, reachability |
 | Graph | 16 | Infrastructure dependency graph | NetBox ORM | Blast radius, failure domains |
 
 All three can coexist in a single policy. Config and graph engines are available to Premium tier customers.
@@ -88,7 +88,7 @@ The config engine answers "does the **intended configuration** satisfy the polic
 
 A **compliance finding** means the intended configuration violates a policy. Whether a live device differs from intent is an Assurance question — keep the two apart when explaining results.
 
-The config engine has two layers. The **text layer** parses the configuration per **family** (`ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `fortios`, `asa`, `aoscx`) and runs text primitives, vendor-neutral hardening controls (resolved to each family's syntax through pattern tables) and the hostname parity check. The **model layer** (analysis service) builds a vendor-independent network model for routing/reachability/ACL questions and the remaining source-of-truth parity checks. Every result records `extra.layer`, `extra.family` and `extra.source`. Full detail: [references/config-compliance.md](references/config-compliance.md).
+The config engine has two layers. The **text layer** parses the configuration per **family** (`ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `fortios`, `asa`, `aoscx`) and runs text primitives, vendor-neutral hardening controls (resolved to each family's syntax through pattern tables; each has a `plane`: management, control or data) and the text-layer parity checks (hostname, plus AAA/SNMP and — for FortiOS, PAN-OS, ASA and AOS-CX — NTP/DNS/syslog context checks). The **model layer** (analysis service) builds a vendor-independent network model for routing/reachability/ACL questions and the remaining source-of-truth parity checks. Every result records `extra.layer`, `extra.family` and `extra.source`. Full detail: [references/config-compliance.md](references/config-compliance.md).
 
 ### Config Sources
 
@@ -157,11 +157,11 @@ Creating a run does NOT execute it. Two-step process:
 
 ```bash
 RUN_ID=$(curl -s -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
-  -d '{"policy": 1, "trigger": "manual"}' | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
+  -d '{"policy": 1, "trigger": "manual", "status": "pending"}' | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
 curl -X POST "$NETBOX_URL/api/plugins/validation/runs/$RUN_ID/execute/" -H "Authorization: Bearer $NETBOX_TOKEN"   # synchronous
 ```
 
-The execute endpoint is **synchronous** — it returns results when the run completes. Do not poll.
+`policy`, `trigger` and `status` (always `"pending"`) are all required — the POST returns 400 without `status`. The execute endpoint is **synchronous** — it returns results when the run completes. Do not poll.
 
 ### Install a Policy Pack
 
@@ -206,8 +206,8 @@ curl -X PATCH "$NETBOX_URL/api/plugins/validation/findings/42/" -H "Authorizatio
 ### Run Against a Branch / Targeted Runs
 
 ```bash
-curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" -d '{"policy": 1, "trigger": "manual", "branch_id": 5}'
-curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" -d '{"policy": 1, "trigger": "api", "target_sites": [9]}'
+curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" -d '{"policy": 1, "trigger": "manual", "status": "pending", "branch_id": 5}'
+curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" -d '{"policy": 1, "trigger": "api", "status": "pending", "target_sites": [9]}'
 curl -X POST "$NETBOX_URL/api/plugins/validation/runs/validate-device/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" -d '{"device": 101}'
 ```
 
@@ -229,7 +229,14 @@ YAML carries `config_source` and `config_path_template` but not `config_data_sou
 
 ### Policy Scoping
 
-Policies scope devices via any combination of **sites, regions, site groups, device roles, platforms, tags** (`scope_sites`, `scope_regions`, `scope_site_groups`, `scope_roles`, `scope_platforms`, `scope_tags`). Scope fields are AND-combined. An empty scope means all active devices.
+Policies scope devices via any combination of **sites, regions, site groups, device roles, platforms, tags**. The API field names are `sites`, `regions`, `site_groups`, `roles`, `platforms`, `device_tags` — each a list of NetBox object IDs. Scope fields are AND-combined. An empty scope means all active devices. **Unknown fields are silently ignored**: a body with `scope_sites` creates an *unscoped* policy with no error, so always read `sites` / `roles` back from the response after writing. Rule-level overrides use `roles` and `platforms`.
+
+```bash
+curl -X POST "$NETBOX_URL/api/plugins/validation/policies/" -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "Leaf Baseline", "enable_config_engine": true, "sites": [1, 2], "roles": [3], "device_tags": [7]}'
+```
+
+Choice fields (`config_source`, `trigger`, `status`, `engine`, `category`, `severity`) read back as `{"value", "label"}` objects on policies, rules, runs and results; writes take bare strings. Exceptions: `config_source` on the run detail and on `/runs/{id}/coverage/`, and the `status`/`trigger` inside a policy's `latest_run` summary, are bare strings. Compare `x["status"]["value"]`, not `x["status"]`.
 
 ### Engine Toggles and Config Source
 
@@ -237,6 +244,7 @@ Policies scope devices via any combination of **sites, regions, site groups, dev
 |-------------|---------|--------|
 | `enable_config_engine` | `false` | Enable configuration compliance checks for this policy |
 | `enable_graph_engine` | `false` | Enable graph resilience checks for this policy |
+| `trigger_on_cr_submit` | `true` | Run when a change request is submitted (on by default for new policies) |
 | `config_source` | `template` | `template` or `datasource` — where config rules get their text |
 | `config_data_source` | -- | Data Source ID; required when `config_source` is `datasource` |
 | `config_path_template` | `{{ device.name }}.cfg` | Jinja2 path to each device's file in the Data Source |
@@ -249,21 +257,21 @@ Four kinds of `engine: config` checks. Always read `GET /checks/{name}/` for exa
 
 | Kind | Examples | Parameters |
 |------|----------|------------|
-| Text primitives (9) | `config_contains`, `config_not_contains`, `config_section_present`/`absent`, `config_each_block` (`block`, `when`, `exclude`, `require`, `forbid`), `config_value` (`pattern`, `op`, `value`, `value_from`), `config_section_allowlist`, `config_banner_contains`, `config_unparsed_lines` | Generic, parameterised, all families |
-| Hardening controls (82) | `ssh_version_2`, `telnet_disabled`, `aaa_enabled`, `vty_exec_timeout`, `snmp_v3_priv_required`, `logging_hosts_min_count`, `ntp_authentication_enabled`, `bgp_authentication_configured`, `urpf_enabled_on_edge`, `bpduguard_on_access_ports`, `dhcp_snooping_enabled` | Mostly none; thresholds and `edge`/`access_when` selectors on some; `framework_refs` on all |
-| Source-of-truth parity (17) | `hostname_matches_netbox`, `interface_descriptions_match_netbox`, `interface_ips_match_ipam`, `vrfs_match_netbox`, `vlans_match_netbox`, `bgp_neighbors_match_netbox`, `ntp_servers_match_context` | `expected` = NetBox, `actual` = configuration |
-| Model layer (34) | `config_parse_status`, `bgp_sessions`, `duplicate_ips`, `acl_reachability`, `assert_traffic_blocked`, `differential_reachability` | See [references/check-reference.md](references/check-reference.md) |
+| Text primitives (9) | `config_contains`, `config_not_contains`, `config_section_present`/`absent`, `config_each_block` (`block`, `when`, `exclude`, `require`, `forbid`, `min_blocks`), `config_value` (`pattern`, `op`, `value`, `value_from`), `config_section_allowlist`, `config_banner_contains`, `config_unparsed_lines` | Generic, parameterised, all families; `section` + `section_depth: top\|any` on contains/not_contains/value. Block bodies are matched with indentation stripped (`^exec-timeout`, not `^ exec-timeout`) |
+| Hardening controls (84) | `ssh_version_2`, `telnet_disabled`, `aaa_enabled`, `vty_exec_timeout`, `snmp_v3_priv_required`, `logging_hosts_min_count`, `ntp_authentication_enabled`, `bgp_authentication_configured`, `urpf_enabled_on_edge`, `bpduguard_on_access_ports`, `dhcp_snooping_enabled`, `vlan1_pruned_from_trunks`, `local_accounts_least_privilege` | Mostly none; thresholds and `edge`/`access_when` selectors on some; `plane` and `framework_refs` on all |
+| Source-of-truth parity (24) | `hostname_matches_netbox`, `interface_descriptions_match_netbox`, `interface_ips_match_ipam`, `netbox_interfaces_present_in_config`, `cabled_interfaces_enabled`, `vrfs_match_netbox`, `vlans_match_netbox` (`mode: subset\|superset\|equal`), `bgp_neighbors_match_netbox`, `router_id_is_loopback`, `fhrp_matches_netbox`, `ntp_servers_match_context` | `expected` = NetBox, `actual` = configuration |
+| Model layer (41) | `config_parse_status`, `bgp_sessions`, `duplicate_ips`, `acl_reachability`, `filter_permits`/`filter_denies`, `route_policy_behaves`, `mlag_consistency`, `assert_traffic_blocked`, `differential_reachability` | See [references/check-reference.md](references/check-reference.md) |
 
-Hardening pattern tables are per family and still expanding: a control with no pattern for the device's family returns `skip` ("no pattern for family"), never `fail` — check `families` in the catalog and use text primitives where needed. Map custom platform slugs with the plugin setting `platform_families: {"<slug>": "<family>"}`.
+The catalog's `families` lists the families a hardening control has a pattern for (e.g. `vtp_transparent_or_off` → `["ios", "nxos"]`). Pre-flight a policy against it: a device whose family is absent gets `skip` with `extra.reason` `"not applicable"` (message explains why, e.g. "PAN-OS does not implement VTP") or `"no pattern for family"` — never `fail`. Use text primitives for those devices. Map custom platform slugs with the plugin setting `platform_families: {"<slug>": "<family>"}`.
 
 ### Policy Packs
 
 Pre-built policy packs provide one-click installation:
 
-- **18 starter packs** — addressing, cabling, data quality, naming, redundancy, security intent, leaf/spine baselines, power/network/full resilience, BGP attributes, pre-change config, and five configuration-compliance packs: **Management Plane Security** (36), **Layer 2 Hardening** (19), **Routing Protocol Security** (16), **Source-of-Truth Parity** (17), **Intended Config Baseline** (19)
-- **12 compliance frameworks** (Premium; `enabled_policy_packs` must include `"compliance"`) — CLOS Fabric, TIA-942, NIS2/DORA, NIST 800-53, NERC CIP, PCI-DSS, MANRS, ISO 27001, HIPAA Security Rule (2026) — all rebuilt on the check catalog with hardening controls — plus **CIS Benchmarks — Network Devices** (64), **DISA STIG — Routers and Switches** (64), **NSA Network Infrastructure Security** (57). 525 rules total.
+- **18 starter packs** (213 rules) — addressing, cabling, data quality, naming, redundancy, security intent, leaf/spine baselines, power/network/full resilience, BGP attributes, pre-change config, and five configuration-compliance packs: **Management Plane Security** (37), **Layer 2 Hardening** (20), **Routing Protocol Security** (16), **Source-of-Truth Parity** (24), **Intended Config Baseline** (20)
+- **12 compliance frameworks** (Premium; `enabled_policy_packs` must include `"compliance"`) — CLOS Fabric, TIA-942, NIS2/DORA, NIST 800-53, NERC CIP, PCI-DSS, MANRS, ISO 27001, HIPAA Security Rule (2026) — all rebuilt on the check catalog with hardening controls — plus **CIS Benchmarks — Network Devices** (64), **DISA STIG — Routers and Switches** (65), **NSA Network Infrastructure Security** (58). 528 rules total.
 
-Installed packs create regular policies and rules. After installation, customize scope, config source, parameters, triggers, and schedule. See [references/policy-packs.md](references/policy-packs.md).
+`GET /policy-packs/` returns a bare JSON array (no `count`/`results`); each entry carries `rule_count`, `engines`, `families` (families where at least half of the pack's config rules apply) and `family_coverage` (share per family), `installed` and `installed_policy_ids`. Installed packs create regular policies and rules. After installation, customize scope, config source, parameters, triggers, and schedule. See [references/policy-packs.md](references/policy-packs.md).
 
 ### Delete Rules and Policies
 
@@ -273,25 +281,13 @@ Since plugin 1.13.0, `DELETE /rules/{id}/` and `DELETE /policies/{id}/` preserve
 
 ## Validation Triggers
 
-### Manual
-
-Create a run via API or click "Run Now" in the UI. Two-step: create run, then execute.
-
-### Branch Merge
-
-Set `trigger_on_branch_merge: true` on the policy. Validation runs automatically when a NetBox Branching branch is merged to main. Catches regressions in the merged data.
-
-### Change Request Submit
-
-Set `trigger_on_cr_submit: true` on the policy. Validation runs when a NetBox Changes change request is submitted for review. The run targets the CR's branch, providing pre-merge safety.
-
-### Scheduled
-
-Set a cron expression on the policy's `schedule` field — `0 2 * * *` (daily 02:00), `0 */6 * * *` (every 6 hours), `0 0 * * 0` (weekly, Sunday midnight). Scheduled runs target main (no branch context).
-
-### Inline (API)
-
-`POST /policies/{id}/evaluate/` creates and (with `wait: true`) executes a run with `config_source: inline` and `trigger: api`. Only config rules run; intent and graph rules are skipped for that run. Pair it with a scheduled or CR-triggered run of the same policy for full coverage.
+| Trigger | How | Notes |
+|---|---|---|
+| Manual | API create + execute, or "Run Now" in the UI | Two-step: create (`status: "pending"`), then execute |
+| Branch merge | `trigger_on_branch_merge: true` | Runs when a NetBox Branching branch is merged to main; catches regressions in the merged data |
+| Change request submit | `trigger_on_cr_submit: true` (default on) | Runs when a NetBox Changes change request is submitted; targets the CR's branch for pre-merge safety |
+| Scheduled | cron in `schedule` — `0 2 * * *` (daily 02:00), `0 */6 * * *` (every 6 hours), `0 0 * * 0` (weekly) | Targets main (no branch context) |
+| Inline (API) | `POST /policies/{id}/evaluate/` | Creates (and with `wait: true` executes) a run with `config_source: inline`, `trigger: api`; only config rules run — pair with a scheduled or CR-triggered run of the same policy for full coverage |
 
 ### Run Scoping
 
@@ -370,7 +366,7 @@ When running validation against a branch, pass `branch_id` on the run. The engin
 
 ### Agentic Integration via MCP
 
-The NetBox Labs Platform MCP Server provides 10 validation tools:
+The NetBox Labs Platform MCP Server provides 11 validation tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -384,6 +380,7 @@ The NetBox Labs Platform MCP Server provides 10 validation tools:
 | `get_validation_check` | One check's parameters, defaults, families, `framework_refs` — read before writing a rule |
 | `get_validation_run_coverage` | Config source provenance, families, missing devices and coverage for a run |
 | `evaluate_device_configs` | Inline evaluation of `{device: config text}` against a policy (`policy_id`, `configs`, `origin`, `wait`; ≤ 50 devices / 1 MB) |
+| `create_validation_rule` | Add a rule to a policy, catalog-driven: validates `check_name` and parameters against `GET /checks/{name}/`, suggests near-miss names; `dry_run: true` returns the resolved payload without writing |
 
 Agents that prefer direct API access can use the REST endpoints with bearer token authentication.
 
@@ -404,11 +401,15 @@ Validation provides the automated safety net ensuring agents operate within the 
 | Mistake | Why It Fails | Do This Instead |
 |---------|-------------|-----------------|
 | Create a run and assume it executes | Creating a run sets status to `pending` | POST to `/runs/{id}/execute/` after creation |
-| Omit `trigger` field when creating runs | `trigger` is required | Set `trigger` to `"manual"`, `"api"`, or `"schedule"` |
+| Omit `trigger` or `status` when creating runs | Both are required — 400 `{"status": ["This field is required."]}` | Body is always `{"policy": <id>, "trigger": "manual", "status": "pending"}` (`trigger` may be `"api"` or `"schedule"`) |
+| Scope a policy with `scope_sites` / `scope_roles` / `scope_tags` | Unknown fields are silently dropped — the policy is created **unscoped** (all devices) | Use `sites`, `regions`, `site_groups`, `roles`, `platforms`, `device_tags` (ID lists) and read `sites`/`roles` back from the response |
+| Compare a choice field to a bare string | `status`, `trigger`, `engine`, `severity`, `config_source` read back as `{"value", "label"}` | Compare `["value"]`; write bare strings |
 | Use branch integer ID for branch validation | `branch_id` on run creation expects the branch's integer ID, but `X-NetBox-Branch` header uses `schema_id` | Use the correct identifier for each context |
 | Install config/graph packs without enabling engine | Config/graph rules produce `skip` results | Set `enable_config_engine` / `enable_graph_engine` on the policy |
 | Guess config check parameter names | Unknown parameters are ignored (defaults apply); missing required ones (`block`, `pattern`, `section`) produce `error` | Read `GET /checks/{name}/` first |
-| Expect hardening controls to fail on an unsupported family | Controls skip ("no pattern for family") where no pattern exists | Check `families` in the catalog; use text primitives for those devices |
+| Anchor a block-body regex on leading whitespace (`^ exec-timeout`) | Block bodies are evaluated with indentation stripped — the pattern never matches | Write `^exec-timeout (\d+)`; prefer the `vty_exec_timeout` control, which also rejects `exec-timeout 0 0` (= never) |
+| Expect hardening controls to fail on an unsupported family | Controls skip (`not applicable` / `no pattern for family`) where the catalog's `families` omits the device's family | Check `families` in the catalog before adding the rule; use text primitives for those devices |
+| Treat a `config_each_block` pass as proof the blocks exist | With no matching block it passes with "No matching blocks to evaluate" | Set `min_blocks` (fails with "Only 0 block(s) matched") |
 | Treat `skip` or `warning` as failures | Skips are excluded from scores; warnings count as passed | Read `skipped_checks` and `/runs/{id}/coverage/` to find real gaps |
 | Describe compliance findings as the live network being wrong | Config rules evaluate *intended* configuration, not device state | Say the intended configuration violates the policy; Assurance verifies the network |
 | Call `evaluate` with unknown device names | 404; devices must exist for scoping and parity | Create the device in NetBox first |
@@ -451,9 +452,9 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/compliance/distribution/` | GET | Histogram of device compliance scores |
 | `/compliance/worst-performers/?limit=N` | GET | Lowest-scoring devices |
 | `/checks/` | GET | Catalog of every built-in check (filter by `engine`, `layer`, `group`, `category`, `family`) |
-| `/checks/{name}/` | GET | One check: parameters, defaults, families, sources, `requires_proposed`, `framework_refs` |
-| `/policy-packs/` | GET | List available policy packs |
-| `/policy-packs/{slug}/` | GET | Pack details with rule list |
+| `/checks/{name}/` | GET | One check: parameters, defaults, `families`, `plane`, sources, `requires_proposed`, `framework_refs` |
+| `/policy-packs/` | GET | Bare array of packs (`rule_count`, `engines`, `families`, `family_coverage`, `installed`, `installed_policy_ids`) |
+| `/policy-packs/{slug}/` | GET | Pack details plus `policies[]` and `rules[]` |
 | `/policy-packs/{slug}/install/` | POST | Install a pack |
 | `/policy-packs/{slug}/uninstall/` | POST | Uninstall a pack |
 
@@ -465,10 +466,10 @@ All endpoints under `/api/plugins/validation/`.
 
 ### Plugin 1.15 — Configuration Compliance (2026-10)
 
-- Config engine rebuilt around **config sources** (Config Templates, Data Source, inline API), a **text layer** (9 primitives, 82 vendor-neutral hardening controls with framework references, `hostname_matches_netbox`) and a **model layer** (34 checks plus 16 source-of-truth parity checks). Config checks: 35 → 142.
+- Config engine rebuilt around **config sources** (Config Templates, Data Source, inline API), a **text layer** (9 primitives, 84 vendor-neutral hardening controls with framework references, 6 text-layer parity checks) and a **model layer** (41 checks plus 18 source-of-truth parity checks). Config checks: 35 → 158.
 - New endpoints: `POST /policies/{id}/evaluate/`, `GET /runs/{id}/coverage/`, `GET /runs/{id}/matrix/`, `GET /checks/`, `GET /checks/{name}/`. New policy fields `config_source`, `config_data_source`, `config_path_template`; run fields `skipped_checks`, `config_source`, `config_provenance`.
 - Result semantics: `warning` counts as passed, `skip` is excluded from scores, fleet-scoped checks yield one result per run.
-- Packs: 4 new starter packs + Intended Config Baseline (renamed, slug `config-analysis`); 3 new framework packs (CIS, DISA STIG, NSA); regulatory packs rebuilt (525 framework rules).
+- Packs: 4 new starter packs + Intended Config Baseline (renamed, slug `config-analysis`); 3 new framework packs (CIS, DISA STIG, NSA); regulatory packs rebuilt (528 framework rules).
 - Plugin setting `platform_families` maps platform slugs to configuration families.
 
 ### NetBox 4.7 (2026-09-02)
@@ -489,5 +490,5 @@ All endpoints under `/api/plugins/validation/`.
 |-----------|-------------|
 | [references/config-compliance.md](references/config-compliance.md) | Configuring a config source, writing text/hardening/parity rules, result `extra` keys, coverage/matrix/catalog responses, skip reasons |
 | [references/api-patterns.md](references/api-patterns.md) | Need full API examples for policy/run/result lifecycle |
-| [references/check-reference.md](references/check-reference.md) | Need check names, parameters, or engine details for all 202 checks |
+| [references/check-reference.md](references/check-reference.md) | Need check names, parameters, or engine details for all 218 checks |
 | [references/policy-packs.md](references/policy-packs.md) | Need pack catalog, slugs, install/customize guidance, framework details |

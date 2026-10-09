@@ -1,6 +1,6 @@
 # Policy Pack Library
 
-30 packs: 18 starter (203 rules) and 12 compliance frameworks (525 rules). Slugs are the pack file names. Starter packs are listed by default; framework packs appear only when the plugin setting `enabled_policy_packs` includes `"compliance"` (default is `["starter"]`; Premium).
+30 packs: 18 starter (213 rules) and 12 compliance frameworks (528 rules). Slugs are the pack file names. Starter packs are listed by default; framework packs appear only when the plugin setting `enabled_policy_packs` includes `"compliance"` (default is `["starter"]`; Premium).
 
 ## Starter Packs (18)
 
@@ -14,28 +14,28 @@
 | Security Intent Audit | `security-intent` | 5 | Intent | Forbidden values, VRF enforcement, secrets detection |
 | Leaf Intent Baseline | `leaf-intent-baseline` | 10 | Intent + Config | Baseline validation for leaf switches |
 | Spine Intent Baseline | `spine-intent-baseline` | 8 | Intent + Config | Baseline validation for spine switches |
-| Intended Config Baseline | `config-analysis` | 19 | Config | Parse quality, model issues, BGP/OSPF, routing, ACLs, coverage |
+| Intended Config Baseline | `config-analysis` | 20 | Config | Parse quality, model issues, BGP/OSPF, routing, ACLs, coverage |
 | Pre-Change Config Validation | `config-prechange` | 10 | Config | Differential checks for branches |
 | Power Resilience | `power-resilience` | 6 | Graph | Power chain completeness, redundancy, blast radius |
 | Network Resilience | `network-resilience` | 9 | Graph | Topology SPOFs, failure domains, circuit diversity |
 | BGP Attribute Verification | `bgp-attributes` | 3 | Config | BGP local-pref, MED, route advertisement |
 | Full Resilience Audit | `full-resilience-audit` | 15 | Graph | All graph checks — power, topology, routing |
-| Management Plane Security | `management-plane-security` | 36 | Config | AAA, passwords, SSH/Telnet/HTTP, VTY/console, banners, SNMP, logging, NTP |
-| Layer 2 Hardening | `layer2-hardening` | 19 | Config | VLAN 1, native/trunk pruning, STP guards, DHCP snooping, DAI, port security, 802.1X |
+| Management Plane Security | `management-plane-security` | 37 | Config | AAA, local account privilege, passwords, SSH/Telnet/HTTP, VTY/console, banners, SNMP, logging, NTP |
+| Layer 2 Hardening | `layer2-hardening` | 20 | Config | VLAN 1 (access, native, trunk pruning), STP guards, DHCP snooping, DAI, port security, 802.1X |
 | Routing Protocol Security | `routing-protocol-security` | 16 | Config | OSPF/BGP/EIGRP/IS-IS auth, GTSM, max-prefix, filters, uRPF, CoPP |
-| Source-of-Truth Parity | `sot-parity` | 17 | Config | Hostname, interfaces, VRFs, VLANs, BGP, config-context services match NetBox |
+| Source-of-Truth Parity | `sot-parity` | 24 | Config | Hostname, interface presence/state, VRFs, VLANs, BGP, router-id, FHRP, OSPF passives, config-context services match NetBox |
 
 ### Configuration Compliance Starter Packs
 
 Five starter packs evaluate **intended configuration** with the config engine (`enable_config_engine: true`; default config source = Config Templates — switch to a Data Source after install if your intended configuration lives in a repository). See [config-compliance.md](config-compliance.md).
 
-- **Management Plane Security** (36) — central AAA with local fallback, hashed secrets and password policy, SSH-only remote access with strong algorithms, restricted and time-limited VTY/console sessions, login/MOTD banners, SNMPv3 and read-only communities, remote syslog with timestamps, authenticated NTP, configuration archiving.
-- **Layer 2 Hardening** (19) — VLAN 1 not used for management, access or native trunking; explicit trunk VLAN lists; BPDU, root and loop guard; DHCP snooping, DAI, IP source guard, port security, storm control and 802.1X on access ports; unused ports shut in a parking VLAN; CDP/LLDP off on edge ports. Access/edge interface selection is a per-rule regex parameter (`access_when`, `edge`/`edge_when`).
+- **Management Plane Security** (37) — central AAA with local fallback, least-privilege local accounts, hashed secrets and password policy, SSH-only remote access with strong algorithms, restricted and time-limited VTY/console sessions, login/MOTD banners, SNMPv3 and read-only communities, remote syslog with timestamps, authenticated NTP, configuration archiving.
+- **Layer 2 Hardening** (20) — VLAN 1 not used for management, access or native trunking and pruned from trunks (`vlan1_pruned_from_trunks`); explicit trunk VLAN lists; BPDU, root and loop guard; DHCP snooping, DAI, IP source guard, port security, storm control and 802.1X on access ports; unused ports shut in a parking VLAN; CDP/LLDP off on edge ports. Access/edge interface selection is a per-rule regex parameter (`access_when`, `edge`/`edge_when`).
 - **Routing Protocol Security** (16) — OSPF/BGP/EIGRP/IS-IS neighbor authentication with bounded key lifetimes; eBGP TTL security, maximum-prefix and prefix filters; bogon filtering; passive-interface defaults; source routing disabled; uRPF and CoPP; plus BGP/OSPF session compatibility and duplicate router-id detection from the model layer.
-- **Source-of-Truth Parity** (17) — the intended configuration says what NetBox says: hostname, interface descriptions/IPs/admin state/MTU/VRF/switchport/LAG, VRFs, VLANs, BGP neighbors and local AS, NTP/DNS/syslog/AAA/SNMP from config context. Each result reports NetBox as `expected`, configuration as `actual`.
-- **Intended Config Baseline** (19; file `config-analysis.yaml`, previously "Config Analysis Baseline") — parse status/warnings, model-build issues, undefined/unused structures, BGP and OSPF compatibility, duplicate IPs, L3 topology, MTU consistency, routing loops, ECMP consistency, ACL reachability, and a coverage rule (`config_unparsed_lines`, `max_percent: 60`).
+- **Source-of-Truth Parity** (24) — the intended configuration says what NetBox says: hostname, interface descriptions/IPs/admin state/MTU/VRF/switchport/LAG, interface presence in both directions, cabled interfaces up and uncabled ones shut, VRFs, VLANs, BGP neighbors and local AS, router-id on a documented loopback, FHRP groups, OSPF passive interfaces by cabling, NTP/DNS/syslog/AAA/SNMP from config context. Each result reports NetBox as `expected`, configuration as `actual`.
+- **Intended Config Baseline** (20; file `config-analysis.yaml`, previously "Config Analysis Baseline") — parse status/warnings, model-build issues, undefined/unused structures, BGP and OSPF compatibility, duplicate IPs, L3 topology, MTU consistency, routing loops, ECMP consistency, ACL reachability, and a coverage rule (`config_unparsed_lines`, `max_percent: 60`).
 
-Hardening rules use vendor-neutral control names; the device's configuration family selects the syntax. A control is **skipped, not failed**, on a family that has no pattern for it yet — check `families` on `GET /checks/{name}/`.
+Hardening rules use vendor-neutral control names; the device's configuration family selects the syntax. A control is **skipped, not failed**, on a family the catalog's `families` does not list for it (`extra.reason` "not applicable" with an explanation, or "no pattern for family"). Each pack's own `families` (families where at least half of its config rules apply) and `family_coverage` on `GET /policy-packs/` tell you how much of a pack a given platform will actually evaluate — e.g. Source-of-Truth Parity covers 25% of `aoscx` (no model layer) and Layer 2 Hardening does not apply to firewalls.
 
 ## Compliance Framework Packs (12)
 
@@ -43,7 +43,7 @@ Hardening rules use vendor-neutral control names; the device's configuration fam
 
 | Pack | Framework | Slug | Rules | Engines |
 |------|-----------|------|-------|---------|
-| CLOS Fabric Compliance | CLOS leaf-spine | `compliance-clos-fabric` | 19 | Intent + Config + Graph |
+| CLOS Fabric Compliance | CLOS leaf-spine | `compliance-clos-fabric` | 20 | Intent + Config + Graph |
 | TIA-942 Data Center | Data center tiers | `compliance-tia942` | 20 | Intent + Graph |
 | NIS2 / DORA | EU cyber resilience | `compliance-nis2-dora` | 42 | Intent + Config + Graph |
 | NIST 800-53 | US federal security | `compliance-nist-800-53` | 62 | Intent + Config + Graph |
@@ -53,10 +53,10 @@ Hardening rules use vendor-neutral control names; the device's configuration fam
 | ISO 27001:2022 | Info security mgmt | `compliance-iso-27001` | 50 | Intent + Config + Graph |
 | HIPAA Security Rule (2026) | US healthcare ePHI | `compliance-hipaa` | 39 | Intent + Config + Graph |
 | CIS Benchmarks — Network Devices | CIS IOS XE 17.x / NX-OS / Juniper OS | `compliance-cis-network` | 64 | Config |
-| DISA STIG — Routers and Switches | Cisco IOS XE Router NDM/RTR, Switch L2S | `compliance-disa-stig` | 64 | Config |
-| NSA Network Infrastructure Security | NSA guide (March 2022) | `compliance-nsa-network` | 57 | Config |
+| DISA STIG — Routers and Switches | Cisco IOS XE Router NDM/RTR, Switch L2S | `compliance-disa-stig` | 65 | Config |
+| NSA Network Infrastructure Security | NSA guide (March 2022) | `compliance-nsa-network` | 58 | Config |
 
-**Total**: 525 rules across 12 frameworks. The regulatory packs (NIST, PCI, HIPAA, ISO 27001, NERC CIP, MANRS, NIS2/DORA) were rebuilt on the check catalog and now carry hardening controls alongside their intent and graph rules.
+**Total**: 528 rules across 12 frameworks. The regulatory packs (NIST, PCI, HIPAA, ISO 27001, NERC CIP, MANRS, NIS2/DORA) were rebuilt on the check catalog and now carry hardening controls alongside their intent and graph rules.
 
 ### Framework References on Hardening Controls
 
@@ -77,11 +77,14 @@ The CIS, DISA STIG and NSA packs are generated from these references; the regula
 ## Install / Uninstall
 
 ```bash
-# List all available packs (slug, name, category, rule_count, engines, installed)
+# List all available packs — a bare JSON array, not {count, results}. Entry fields: slug, name,
+# description, category (starter|compliance), policy_count, rule_count, engines, families
+# (families where >= 50% of the pack's config rules apply; null when the pack has no config rules),
+# family_coverage ({family: share}), installed, installed_policy_ids
 curl "$NETBOX_URL/api/plugins/validation/policy-packs/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 
-# View pack details (includes full rule list)
+# View pack details (same fields plus policies[] and rules[] with name, engine, category, check_name, severity, description)
 curl "$NETBOX_URL/api/plugins/validation/policy-packs/management-plane-security/" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
 
@@ -102,10 +105,13 @@ Installed packs create regular policies and rules. Customize freely:
 
 ### Narrow Scope
 
+Installed pack policies are **unscoped** (every active device). Scope fields are `sites`, `regions`, `site_groups`, `roles`, `platforms`, `device_tags` — ID lists, no `scope_` prefix. A misspelled field is silently ignored and the policy stays unscoped, so read the scope back.
+
 ```bash
 curl -X PATCH "$NETBOX_URL/api/plugins/validation/policies/5/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
-  -d '{"scope_sites": [1, 2], "scope_roles": [3]}'
+  -d '{"sites": [1, 2], "roles": [3]}'
+curl "$NETBOX_URL/api/plugins/validation/policies/5/" -H "Authorization: Bearer $NETBOX_TOKEN" | python -c "import sys,json; p=json.load(sys.stdin); print(p['sites'], p['roles'])"
 ```
 
 ### Choose the Config Source (config packs)
@@ -139,7 +145,7 @@ Delete rules you don't need, add new ones with different checks or parameters. D
 
 ## Framework Details
 
-### CLOS Fabric Compliance (19 rules)
+### CLOS Fabric Compliance (20 rules)
 
 **Covers**: Leaf-spine full mesh, /31 P2P links, loopback /32s, eBGP multipath, EVPN/VXLAN overlay, ECMP path redundancy, SPOF detection.
 
@@ -205,7 +211,7 @@ Delete rules you don't need, add new ones with different checks or parameters. D
 
 **Prerequisites**: None. Defaults (`min_length: 15`, `max_minutes: 10`, `min_hosts: 2`, `min_servers: 2`) match or exceed the benchmark; lower per rule if your policy differs. Controls are evaluated per family and skipped where no pattern exists.
 
-### DISA STIG — Routers and Switches (64 rules)
+### DISA STIG — Routers and Switches (65 rules)
 
 **Covers**: Hardening controls mapped to the DISA Cisco IOS XE Router NDM, Router RTR and Switch L2S STIGs. Each rule cites V-IDs and CAT; severity follows the highest CAT (CAT I = critical, CAT II = high, CAT III = medium). Session timeouts 5 minutes, password length 15, remote syslog hosts 2.
 
@@ -213,7 +219,7 @@ Delete rules you don't need, add new ones with different checks or parameters. D
 
 **Prerequisites**: Set `login_banner_configured.phrases`; set `edge`/`external` regex parameters on interface-scoped controls to match your external interfaces.
 
-### NSA Network Infrastructure Security (57 rules)
+### NSA Network Infrastructure Security (58 rules)
 
 **Covers**: NSA *Network Infrastructure Security Guide* (March 2022): perimeter access controls (§2.4), centralized AAA (§4), local account and password hygiene (§5), remote logging and clock sync (§6), secure remote administration and services (§7), routing protections (§8), interface port hardening (§9), notification banners (§10). Each rule cites the guide section.
 
