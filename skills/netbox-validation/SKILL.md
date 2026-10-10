@@ -161,7 +161,7 @@ RUN_ID=$(curl -s -X POST "$NETBOX_URL/api/plugins/validation/runs/" -H "Authoriz
 curl -X POST "$NETBOX_URL/api/plugins/validation/runs/$RUN_ID/execute/" -H "Authorization: Bearer $NETBOX_TOKEN"   # synchronous
 ```
 
-`policy`, `trigger` and `status` (always `"pending"`) are all required — the POST returns 400 without `status`. The execute endpoint is **synchronous** — it returns results when the run completes. Do not poll.
+`policy` and `trigger` are required; `status` defaults to `"pending"` (passing it explicitly is harmless and works on older plugin releases, which rejected its absence with a 400). The execute endpoint is **synchronous** — it returns results when the run completes. Do not poll.
 
 ### Install a Policy Pack
 

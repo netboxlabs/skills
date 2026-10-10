@@ -127,7 +127,7 @@ See [config-compliance.md](config-compliance.md) for response shapes and rule-wr
 ## Run Lifecycle
 
 ```bash
-# Create a run — policy, trigger AND status are required (400 without "status"); NOT executed yet
+# Create a run — policy and trigger are required; status defaults to "pending"; NOT executed yet
 curl -X POST "$NETBOX_URL/api/plugins/validation/runs/" \
   -H "Authorization: Bearer $NETBOX_TOKEN" -H "Content-Type: application/json" \
   -d '{"policy": 1, "trigger": "manual", "status": "pending"}'
