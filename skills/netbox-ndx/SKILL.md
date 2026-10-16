@@ -175,7 +175,6 @@ Full sequences in [references/consume-workflows.md](references/consume-workflows
 - **EOL/EOS exposure report:** pull deployed devices from `GET /api/dcim/devices/`, collect their `device_type` ids, match each to its NDX import record, flag types past/near `eos_date`/`last_support_date`, present with provenance. *(4.7)* Also read core `DeviceType.end_of_life` and reconcile the two (see above).
 - **Populate observability config:** read `snmp_sys_object_id`, `extensions_data.snmp.mibs[]`, or `extensions_data.gnmi`/`.netconf`/`.redfish` to drive *what* to poll (NDX gives the what/how, not the config).
 - **Import a catalog entry:** `POST import/` with the `ndx_id`(s).
-- **Discovery created a duplicate of an NDX device type** (NDX type has zero devices; a second type under the same manufacturer has the vendor PID as `model`): see W7 in the workflows reference — plugin 0.8.0+ ships a dry-run-by-default merge command; without shell access, re-point devices by hand.
 
 ## Access Tiers (concept level)
 
@@ -206,7 +205,7 @@ So a `has_lifecycle: true` with empty lifecycle fields is a tier-gating signal, 
 
 Current plugin **0.8.3** (2026-10-15); declares NetBox 4.5.0+ (manifest 4.5–4.7). `populate_core_end_of_life` default unchanged.
 
-- **0.8.0** — `ndx_remediate_duplicates` management command merges Discovery-created duplicate device types back onto the NDX type they collided with (dry run by default; `--apply --user <name>`; W7 in the workflows reference). NDX provenance changes now render in `GET /api/core/object-changes/` as `{id, field, source, provenance_type, confidence, retrieved, note}` — before 0.8.0 any changelog page containing a provenance change returned 500.
+- **0.8.0** — NDX provenance changes now render in `GET /api/core/object-changes/` as `{id, field, source, provenance_type, confidence, retrieved, note}` — before 0.8.0 any changelog page containing a provenance change returned 500.
 - **0.8.1** — Device-type imports create `InventoryItemTemplate`s from the DTL `inventory-items` list (device types only; module types have no inventory item templates). Front↔rear port mappings are read from the DTL `port-mappings` list, including `front_port_position`, so multi-position front ports map correctly on NetBox 4.5+.
 - **0.8.2 / 0.8.3** — Plugin manifest and docs only; the catalog **Type** filter is documented as Device / Module / Rack Types, and import enforces the matching `add` permission per kind.
 

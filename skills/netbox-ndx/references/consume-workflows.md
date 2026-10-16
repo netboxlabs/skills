@@ -70,33 +70,7 @@ Sync **only flags** `update_available=true` on records that have a newer catalog
 GET /api/plugins/ndx/import-records/?update_available=true
 ```
 
-## W7 — Merge Discovery-created duplicates of NDX device types *(plugin 0.8.0+)*
-
-**Symptom.** An NDX-imported device type has zero devices while a second type under the same manufacturer holds the fleet. NDX writes the marketing name in `model` and the vendor PID in `part_number`; Discovery (orb-agent → Diode) pushed the same hardware with the PID as `model` and no `part_number`. NetBox is unique on `(manufacturer, model)` only, so the two never matched and the NDX enrichment applies to nothing.
-
-**Detect (API, any tier).** For each NDX-imported type, look for a non-NDX sibling whose `model` equals its `part_number`:
-```bash
-GET /api/plugins/ndx/import-records/?ndx_vendor_slug=cisco&fields=ndx_manufacturer,ndx_model
-GET /api/dcim/device-types/?manufacturer=cisco&fields=id,model,part_number,slug,device_count
-```
-A duplicate is a type with `model == <NDX type>.part_number`, no NDX import record, usually created by the `diode` user (check `GET /api/core/object-changes/?changed_object_type=dcim.devicetype&action=create&changed_object_id=<id>`).
-
-**Fix (shell access).** The plugin ships a conservative merge command. Dry run first — it prints every candidate pair as READY or SKIP and writes nothing:
-```bash
-python manage.py ndx_remediate_duplicates                      # report only
-python manage.py ndx_remediate_duplicates --manufacturer Cisco # narrow the scan
-python manage.py ndx_remediate_duplicates --apply --user admin # merge; --user is required so the changes are changelogged
-python manage.py ndx_remediate_duplicates --apply --user admin --branch my-branch   # operate inside a Branching branch
-```
-Options: `--created-by <username>` (default `diode` — only types created by this user are treated as duplicates; pairs whose creator cannot be confirmed are skipped) or `--any-creator` (pair on the NDX record + exact PID match alone; broader, less certain).
-
-What a merge does, per READY pair: devices are re-pointed to the NDX type, config-context assignments are moved, then the duplicate is deleted together with its own component templates and port mappings. The NDX type's templates and enrichment are untouched. A pair is **skipped and reported** (never guessed) when the duplicate carries component templates the NDX type lacks — Discovery found interfaces the curated definition does not model, so merging would lose template coverage; the extra template names are listed. Any other reference to the duplicate also blocks that pair.
-
-Run it only after the Discovery-side fix is in place and queued Assurance deviations are drained, otherwise the next ingest recreates the duplicates. On NetBox Cloud the command runs on the NetBox Labs side — raise a support request with the manufacturer and the pairs you found.
-
-**Fix (no shell access).** Replicate the same rules by hand: confirm the NDX type's templates are a superset of the duplicate's, `PATCH /api/dcim/devices/<id>/ {"device_type": <ndx_type_id>}` for each device (bulk PATCH to `/api/dcim/devices/` works), move any config contexts that list the duplicate, then `DELETE /api/dcim/device-types/<dup_id>/`. Do it on a branch if Branching is available.
-
-## W8 — Audit enrichment changes through the changelog *(plugin 0.8.0+)*
+## W7 — Audit enrichment changes through the changelog *(plugin 0.8.0+)*
 
 Import records, enrichments and provenance entries are change-logged. To see what a re-import or sync changed:
 ```bash
