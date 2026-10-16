@@ -108,6 +108,7 @@ if job["status"]["value"] != "completed" or result["status_code"] >= 400:
 - Cannot be combined with `If-Match` → 400. No running RQ worker → 503.
 - `/api/users/tokens/` rejects it with 400 on 4.7.2+ — 4.7.0/4.7.1 stored created token plaintexts in job results. Never create tokens in the background.
 - `fields`/`omit`/`brief` are not applied to the stored result, and any user with `core.view_job` can read it.
+- Inside a branch (`X-NetBox-Branch` or `?_branch=`): **4.7.3+** carries the request headers and query string (minus `background`; `Authorization` is stripped — auth already happened) into the worker, so the write lands in the branch. **4.7.0–4.7.2** dropped them and the write landed in main — do not use `?background=true` in a branch there.
 
 ## Pagination
 
@@ -210,13 +211,15 @@ Use `?fields=` when you need specific non-brief fields. Use `?brief=True` for si
 `?exclude=config_context` is a device/VM-specific switch whose effect depends on version:
 
 - **4.5–4.6**: config context is rendered per object on every request — the single most expensive field (10-100x slower). Always send `?exclude=config_context` on list queries (`?omit=config_context` on 4.5.2+ skips the render the same way, since the field is dropped before serialization).
-- **4.7+**: config context is pre-rendered and cached on the object, always included, and `?exclude=config_context` is **silently ignored**. The render cost is gone; to shrink payloads use `?fields=`, `?brief=True`, or `?omit=config_context`.
+- **4.7.0–4.7.2**: config context is pre-rendered and cached on the object and always loaded; `?exclude=config_context` is **silently ignored** (on every 4.7.x). The render cost is gone; `?fields=`, `?brief=True`, or `?omit=config_context` shrink the payload only.
+- **4.7.3+**: still cached, but when `config_context` is not in the effective field set (`?omit=config_context`, `?fields=` without it, `?brief=True`) list/detail reads skip the DB annotation and defer the cached column — trimming matters for performance again (less than on 4.6, but real). Writes, custom actions and `?export` still load it.
 
 ```python
-# 4.5–4.6 only (no-op on 4.7+)
+# 4.5–4.6 only (no-op on every 4.7.x)
 requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)
 
-# 4.5.2 through 4.7: skips rendering on 4.5/4.6, trims the payload on 4.7
+# 4.5.2 through 4.7 — the version-portable form: skips rendering on 4.5/4.6,
+# trims the payload on 4.7.0–4.7.2, skips the DB annotation on 4.7.3+
 requests.get(f"{API_URL}/dcim/devices/?omit=config_context", headers=headers)
 ```
 

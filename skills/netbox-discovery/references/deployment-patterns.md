@@ -7,13 +7,13 @@ docker run --net=host \
   -v ${PWD}:/opt/orb/ \
   -e DIODE_CLIENT_ID=your-client-id \
   -e DIODE_CLIENT_SECRET=your-client-secret \
-  netboxlabs/orb-agent:2.15.0 run -c /opt/orb/agent.yaml
+  netboxlabs/orb-agent:2.16.0 run -c /opt/orb/agent.yaml
 ```
 
 - `--net=host` is required for NMAP SYN scans (network_discovery)
 - Alternative: `-u root` instead of `--net=host`
 - Mount the directory containing `agent.yaml` to `/opt/orb/`
-- Pin the image tag (Docker Hub tags are bare semver: `2.15.0`); `latest` tracks the newest release
+- Pin the image tag (Docker Hub tags are bare semver: `2.16.0`); `latest` tracks the newest release
 
 ### Running as a service
 
@@ -24,7 +24,7 @@ docker run -d --name orb-agent --restart unless-stopped \
   --net=host \
   -v /local/orb:/opt/orb/ \
   --env-file /local/orb/.env \
-  netboxlabs/orb-agent:2.15.0 run -c /opt/orb/agent.yaml
+  netboxlabs/orb-agent:2.16.0 run -c /opt/orb/agent.yaml
 ```
 
 - `--stop-timeout 60`: the agent stops backends one at a time and finalizes in-flight policy runs, which can exceed Docker's 10 s default
@@ -41,7 +41,7 @@ docker run -d --name orb-agent --restart unless-stopped \
 sudo podman run --privileged --net=host \
   -v ${PWD}:/opt/orb/ \
   -e DIODE_CLIENT_ID -e DIODE_CLIENT_SECRET \
-  netboxlabs/orb-agent:2.15.0 run -c /opt/orb/agent.yaml
+  netboxlabs/orb-agent:2.16.0 run -c /opt/orb/agent.yaml
 ```
 
 ### Rootless (restricted)
@@ -50,7 +50,7 @@ sudo podman run --privileged --net=host \
 podman run \
   -v ${PWD}:/opt/orb/ \
   -e DIODE_CLIENT_ID -e DIODE_CLIENT_SECRET \
-  netboxlabs/orb-agent:2.15.0 run -c /opt/orb/agent.yaml
+  netboxlabs/orb-agent:2.16.0 run -c /opt/orb/agent.yaml
 ```
 
 Rootless requires network_discovery policies to use:

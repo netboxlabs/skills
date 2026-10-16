@@ -263,5 +263,5 @@ except pynetbox.RequestError as exc:
 ## References
 
 - [NetBox Branching Plugin](https://github.com/netboxlabs/netbox-branching)
-- [NetBox Branching Documentation](https://netboxlabs.com/docs/netbox-branching/)
+- [NetBox Branching Documentation](https://netboxlabs.com/docs/branching/)
 - [NetBox Jobs Framework](https://netboxlabs.com/docs/netbox/en/stable/features/background-jobs/)

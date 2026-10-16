@@ -2,7 +2,7 @@
 
 44 intent, 158 config (9 text primitives, 84 hardening controls, 24 source-of-truth parity, 41 model-layer), 16 graph. Parameters below are a summary; the authoritative schema, defaults, supported families and framework references for any check come from `GET /api/plugins/validation/checks/{name}/` — read it before writing a rule.
 
-Checks evaluate NetBox data or intended configuration server-side; parameters are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` always present) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+Checks evaluate NetBox data or intended configuration server-side; parameters are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` present by default (omit it with `?omit=config_context` on 4.7.3+)) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
 
 ## Intent Checks (44)
 

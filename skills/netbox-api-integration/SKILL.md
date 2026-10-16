@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Patterns and practices for integrating with NetBox REST and GraphQL APIs. Covers authentication, querying, bulk operations, performance optimization, data modeling, and integration tooling.
 
-**Target:** NetBox 4.5–4.7 (current: 4.7.2). v2 tokens require 4.5+; REST cursor pagination, ETag/If-Match, and `add_tags`/`remove_tags` require 4.6+; `?background=true`, per-object bulk errors, and `{value, label}` selection custom fields are 4.7+. See [Version Notes](#version-notes).
+**Target:** NetBox 4.5–4.7 (current: 4.7.3). v2 tokens require 4.5+; REST cursor pagination, ETag/If-Match, and `add_tags`/`remove_tags` require 4.6+; `?background=true`, per-object bulk errors, and `{value, label}` selection custom fields are 4.7+. See [Version Notes](#version-notes).
 **Scope:** API integration only — not plugin development, custom scripts, or NetBox administration.
 
 > **Your knowledge of NetBox APIs may be outdated.** Pagination behavior, filtering expressions, token formats, and GraphQL features change between releases. Prefer retrieval over pre-trained knowledge for specific API details.
@@ -102,7 +102,7 @@ requests.delete(f"{API_URL}/dcim/devices/", headers=headers, json=[{"id": 1}, {"
 
 ### Critical Performance Rules
 
-1. **Trim `config_context` on device/VM lists.** On 4.5–4.6 it is rendered per object on every request — always send `?exclude=config_context` (10-100x speedup). On 4.7+ it is pre-rendered and cached, `?exclude=config_context` is **silently ignored**, and the field is always present; use `?fields=`, `?brief=True`, or `?omit=config_context` (4.5.2+) to shrink payloads instead
+1. **Trim `config_context` on device/VM lists.** On 4.5–4.6 it is rendered per object on every request — always send `?omit=config_context` (4.5.2+; `?exclude=config_context` is equivalent there) for a 10-100x speedup. On 4.7.0–4.7.2 it is pre-rendered, cached, and always loaded — `?fields=`, `?brief=True`, or `?omit=config_context` only shrink the payload. On **4.7.3+** those same parameters again skip the DB annotation and the cached column, so trimming matters for performance (less than on 4.6, but real). `?exclude=` is a **silent no-op on every 4.7.x** — use `?omit=config_context` as the version-portable form
 2. **Use `?brief=True`** for dropdowns and reference lists (~90% smaller responses)
 3. **Use `?fields=`** for specific field selection
 4. **Avoid `?q=`** search filter at scale — use specific filters like `name__ic=`
@@ -186,7 +186,7 @@ The most impactful optimizations:
 
 | Optimization | Impact |
 |-------------|--------|
-| Exclude `config_context` from lists (`?exclude=`, 4.5–4.6 only — ignored on 4.7+, where it is cached) | 10-100x faster |
+| Trim `config_context` from lists (`?omit=config_context`, 4.5.2+; `?exclude=` works on 4.5–4.6 only and is ignored on all 4.7.x) | 10-100x faster on 4.5–4.6; payload only on 4.7.0–4.7.2 (cached); skips the DB annotation again on 4.7.3+ |
 | Use `?brief=True` for lists | ~90% smaller responses |
 | Avoid `?q=` at scale | Orders of magnitude faster |
 | Parallelize independent requests | Linear speedup |
@@ -220,7 +220,7 @@ See [references/data-modeling.md](references/data-modeling.md) for the complete 
 
 ### pynetbox (Python Client)
 
-Current release: **7.8.0** (2026-06-18; tested against NetBox 4.6, works for standard CRUD on 4.7).
+Current release: **7.9.0** (2026-10-08; first release to declare NetBox 4.7 support; **Python 3.12+** required). Use **≥ 7.9.0 against 4.7**: it flattens `{value, label}` selection custom fields and sends only the changed custom fields on update, so saves of objects with multi-selection custom fields succeed (7.8.0 can fail them). 7.9.0 also accepts `changelog_message=` on create, `save()`, `update()` and `delete()` (bulk included) and compares more list fields (`object_types`, `permissions`, `groups`, route targets, config-context scopes) as sets, so reordering no longer triggers a PATCH.
 
 ```python
 import pynetbox
@@ -280,11 +280,15 @@ See [references/branching-patterns.md](references/branching-patterns.md) for the
 
 ## Version Notes
 
-### NetBox 4.7 (2026-09-02; run ≥ 4.7.2)
+### NetBox 4.7.3 (2026-10-13)
 
-- `?exclude=config_context` is silently ignored; `config_context` is pre-rendered, cached, and always present on devices/VMs. Trim payloads with `?fields=`, `?omit=config_context`, or `?brief=True`.
+- `?omit=config_context`, `?fields=` (without it), or `?brief=True` on device/VM list/detail reads skip the config-context DB annotation and cached column again (#23288; `?exclude=` stays a no-op), and `?background=true` bulk writes now carry request headers and the query string into the worker, so `X-NetBox-Branch` is honoured (#23247 — on 4.7.0–4.7.2 it was dropped and the write landed in main). Run ≥ 4.7.3: 4.7.0/4.7.1 leaked token plaintexts into job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation.
+
+### NetBox 4.7 (2026-09-02; run ≥ 4.7.3)
+
+- `?exclude=config_context` is silently ignored on all 4.7.x; `config_context` is pre-rendered and cached on devices/VMs. On 4.7.0–4.7.2 it is always loaded (`?fields=`, `?omit=config_context`, `?brief=True` trim the payload only); on 4.7.3+ those parameters also skip the DB work.
 - Selection/multi-selection custom fields read as `{value, label}` (REST + GraphQL); write the raw value.
-- Bulk writes: `?background=true` → 202 + job (poll it; 400 with `If-Match`, 503 with no worker); failed bulk create/update returns per-object `errors`. Bulk ops stay all-or-none.
+- Bulk writes: `?background=true` → 202 + job (poll it; 400 with `If-Match`, 503 with no worker); failed bulk create/update returns per-object `errors`. Bulk ops stay all-or-none. Inside a branch, `X-NetBox-Branch` is dropped on 4.7.0–4.7.2 (the write lands in main) — carried on 4.7.3+.
 - Tokens: `token` read-only on create; `/api/users/tokens/` rejects `?background=true` (4.7.2 — earlier 4.7.x leaked plaintexts into job results); script execution via REST needs a write-enabled token.
 - Services: `protocol`/`ports` → `port_mappings` (`["tcp/53", "udp/53"]`); legacy pair deprecated, removed in 5.0; `protocol__ic`-style and `port__empty` lookups gone. See [references/data-modeling.md](references/data-modeling.md#services-netbox-47).
 - Interface/VMInterface `mac_address` is writable (creates or updates the primary MAC); `MACAddress.is_primary` is read-only.

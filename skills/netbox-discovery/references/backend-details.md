@@ -1,6 +1,6 @@
 # Backend Details Reference
 
-Full parameter reference and entity mappings for each Orb Agent discovery backend (orb-agent v2.15.0). Key names below are verified against the backend docs in the orb-agent repo — several differ from older skill versions (`match`/`type` in interface patterns, `protocol_version` for SNMP auth, flat `icmp_*` flags, device options under `config.options`).
+Full parameter reference and entity mappings for each Orb Agent discovery backend (orb-agent v2.16.0). Key names below are verified against the backend docs in the orb-agent repo — several differ from older skill versions (`match`/`type` in interface patterns, `protocol_version` for SNMP auth, flat `icmp_*` flags, device options under `config.options`).
 
 ## Entity Mapping Summary
 
@@ -30,9 +30,10 @@ policies:
           description: "Discovered by NMAP"
           comments: ""
           tags: [discovered]
-          vrf: mgmt                    # Optional VRF for discovered IPs
-          rd: "65000:100"              # Optional; omit to match a VRF with null rd
-          tenant: acme
+          vrf: mgmt                    # Optional VRF for discovered IPs — bare name, or a map (v2.16):
+          # vrf: { name: mgmt, rd: "65000:100", tenant: { name: acme, group: customers } }   # vrf.tenant = the VRF's own tenant
+          rd: "65000:100"              # Optional; omit to match a VRF with null rd (same as vrf.rd — both set differently = refused)
+          tenant: acme                 # IP tenant — bare name or {name, group, description, comments, tags} (v2.16); does NOT set the VRF's tenant
           role: management
           network_mask: 24             # Default mask for IPv4 (default 32)
       scope:
@@ -99,7 +100,8 @@ policies:
           discover_vrfs: false            # VRF entities from get_network_instances()
           create_unknown_vlans: true      # stub VLANs referenced on interfaces but absent from the VLAN DB
           emit_host_prefixes: false       # derive Prefix from /32 and /128
-          emit_prefix_vlan: off           # off | svi-name
+          emit_prefix_vlan: off           # off | svi-name — svi-name also uses device-reported VLAN IDs where the driver supports it (v2.16)
+          emit_lag_membership: true       # Interface.lag from get_interfaces_lag() (Junos ae bundles); false skips the call (v2.16)
           propagate_defaults_to_prefix_scope: false
         defaults:
           site: main-dc
@@ -110,7 +112,7 @@ policies:
               type: virtual
           interface_exclude_patterns: ["^veth", "^docker"]
           location: rack-a1
-          rack: R101
+          rack: R101                     # rack name in site/location; quote numeric names ("01"); position/face only per target (v2.16)
           tenant: engineering            # or a map: {name, group, description, tags}
           stack_member_name_template: "{name}-{id}"   # Virtual Chassis member naming
           description: "Discovered device"
@@ -138,9 +140,10 @@ policies:
             vrf: ""
             scope_site: ""
             scope_location: ""
-          vrf:
+          vrf:                           # configured VRF (ipaddress.vrf / prefix.vrf take the same map)
             name: ""
             rd: ""
+            tenant: ""                   # the VRF's own tenant — name or {name, group, ...}; never inherited from ipaddress/prefix tenant (v2.16)
           vlan:
             group: campus-vlans          # bare name = scoped to defaults.site; map form below
             # group:
@@ -158,6 +161,9 @@ policies:
             ssh_config_file: /opt/orb/ssh_config
           override_defaults:
             site: remote-dc
+            rack: R12                  # rack: "" keeps this device out of the policy rack
+            position: 40               # U from 1, steps of 0.5 — only here, only with face, single-address targets only (v2.16)
+            face: front                # front | rear
           netbox_id: 42                # match existing device by PK (ignored for subnets/ranges)
         - hostname: 10.0.1.0/28       # Subnet / range scanning (max 65536 addresses per policy)
           username: admin
@@ -226,10 +232,13 @@ policies:
           emit_prefix_vlan: off        # off | svi-name
           emit_device_name: true       # false = suppress sysName rename proposals (needs netbox_id or asset_tag)
           interface_name_source: auto  # auto | ifname | ifdescr (changing this renames interfaces!)
+          emit_lag_membership: true    # Interface.lag from IEEE8023-LAG-MIB; Junos units collapse onto the physical port (v2.16)
+          # vlan_interface_name_prefix: Vlan   # bare-VLAN-ID interfaces (Cisco SMB, Eltex, UniFi): 5 → Vlan5; set/change renames! (v2.16)
           propagate_defaults_to_prefix_scope: false
         defaults:
           site: main-dc
           location: ".1.3.6.1.2.1.1.6.0"   # literal, or an SNMP OID reference (sysLocation here)
+          rack: R101                       # literal only (no OID reference); position/face per target (v2.16)
           role: switch
           tenant: network-ops              # str or map
           tags: [snmp-discovered]
@@ -246,7 +255,7 @@ policies:
             if_type: other
           ip_address:                      # note: `ip_address` here, `ipaddress` in device_discovery
             role: management
-            vrf: { name: management, rd: "65000:100" }   # or bare string; vrf_ipv4 / vrf_ipv6 overrides
+            vrf: { name: management, rd: "65000:100", tenant: network-ops }   # or bare string; tenant = the VRF's own (v2.16); vrf_ipv4 / vrf_ipv6 overrides
             description: ""
           prefix: { role: "", tenant: "", vrf: "", scope_site: "", scope_location: "" }
           vlan:
@@ -265,6 +274,9 @@ policies:
             netbox_id: 42
             override_defaults:
               role: core
+              rack: R12                  # + position/face: only here, together, single-host targets only (v2.16)
+              position: 40.5
+              face: rear
           - host: 10.0.0.10
             authentication:              # per-target override replaces the policy block wholesale
               protocol_version: SNMPv3
@@ -298,9 +310,13 @@ policies:
         rescan_interval_ms: 0          # re-probe unsubscribed addresses; 0 = off, min 60000
         options:
           capture_config: false        # CONFIG datastore → Device.config.running
-        defaults:                      # same shape as device_discovery (site, role, location, tags,
-          site: main-dc                # device, interface, ip_address, vrf, vlan.group, interface_patterns, ...)
+          emit_lag_membership: true    # Interface.lag from OpenConfig aggregate-id; aggregate must be discovered and typed lag (v2.16)
+        defaults:                      # same shape as device_discovery (site, role, location, rack, tags,
+          site: main-dc                # device, interface, ip_address, prefix, vrf, vlan.group, interface_patterns, ...)
           role: switch
+          rack: R101                   # rack name (v2.16)
+          vrf:
+            tenant: { name: acme, group: customers }   # applied to every discovered VRF; ip_address/prefix/vlan tenants take the same map (v2.16)
       scope:
         username: ${GNMI_USER}         # scope-level defaults for every target
         password: ${GNMI_PASS}
@@ -312,6 +328,10 @@ policies:
             netbox_id: 42
             profile: arista_eos        # pin a vendor profile (auto-detected when omitted)
             mode: on_change
+            override_defaults:
+              rack: R12                # position/face: only in override_defaults, together, single-endpoint targets (v2.16)
+              position: 40
+              face: front
           - host: 10.0.0.0/24          # CIDR or range: swept, then each responder subscribed
             port: 9339                 # no inline :port on ranges
 ```
@@ -348,14 +368,15 @@ docker run --net=host \
   -v ${PWD}/workers:/opt/workers/ \
   -e INSTALL_WORKERS_PATH=/opt/workers \
   -e DIODE_CLIENT_ID -e DIODE_CLIENT_SECRET \
-  netboxlabs/orb-agent:2.15.0 run -c /opt/orb/agent.yaml
+  netboxlabs/orb-agent:2.16.0 run -c /opt/orb/agent.yaml
 ```
 
 ## Telemetry Backends (Observability)
 
-`snmp_telemetry` and `gnmi_telemetry` (both v1.0.0, shipped in the orb-agent image since v2.15.0) poll/subscribe to devices and export metrics over OTLP. They ingest **nothing into Diode/NetBox** and belong to the NetBox Observability product — this skill only notes how they coexist with discovery:
+`snmp_telemetry` and `gnmi_telemetry` (both v1.1.0 in orb-agent 2.16.0; first shipped as v1.0.0 in 2.15.0) poll/subscribe to devices and export metrics over OTLP. They ingest **nothing into Diode/NetBox** and belong to the NetBox Observability product — this skill only notes how they coexist with discovery:
 
 - Require `backends.common.otlp.grpc`; the agent refuses to start if a telemetry backend is enabled without it.
+- Each policy's series are exported under their own OTLP instrumentation scope carrying `policy_name` *(v1.1.0 / orb-agent 2.16)*.
 - The image's default config declares them `start_mode: on_demand`, so they start only when a telemetry policy arrives.
 - Policy credentials may reference `${NAME}` only if the backend's `policy_env_vars` lists that name.
 - `snmp_telemetry` trap reception binds the UDP port named by the policy's `listen` (conventionally 162) — publish it (`-p 162:162/udp`) when not using `--net=host`.

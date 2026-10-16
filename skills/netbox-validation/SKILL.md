@@ -475,7 +475,7 @@ All endpoints under `/api/plugins/validation/`.
 ### NetBox 4.7 (2026-09-02)
 
 - Requires plugin **1.14.0+**. Checks evaluate NetBox data server-side, so check names and parameters are unchanged.
-- What changes is the core REST API an agent uses to **remediate** findings: selection custom fields read as `{"value", "label"}` (write the raw value — relevant after `custom_field_populated` / `asset_documentation_complete` failures), `config_context` is always present on device reads (`?exclude=config_context` ignored — use `?fields=`), and services use `port_mappings` (`["tcp/443"]`) instead of `protocol` + `ports`. Failed bulk fixes return per-object errors by `index`. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
+- What changes is the core REST API an agent uses to **remediate** findings: selection custom fields read as `{"value", "label"}` (write the raw value — relevant after `custom_field_populated` / `asset_documentation_complete` failures), `config_context` is present by default (omit it with `?omit=config_context` on 4.7.3+) on device reads (`?exclude=config_context` ignored — use `?fields=`), and services use `port_mappings` (`["tcp/443"]`) instead of `protocol` + `ports`. Failed bulk fixes return per-object errors by `index`. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
 - Branch-context runs on 4.7 need netbox-branching **1.2.x** (1.1.x for NetBox 4.4–4.6) — see [netbox-branching](../netbox-branching/SKILL.md).
 
 ### Plugin 1.12–1.13 (2026-08)

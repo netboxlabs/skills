@@ -30,9 +30,9 @@ provider "netbox" {
 | v5.0.0 – v5.6.0 | 4.3.0 – 4.4.10 |
 | v6.0.0-rc.x | 4.6.8 – 4.6.10 (full rewrite, see below) |
 
-> **No provider release declares NetBox 4.7 support yet.** The provider probes the NetBox version at init and emits a non-blocking warning when unsupported. 4.7 changes most likely to bite the v5.x provider: selection custom fields now read back as `{value,label}` objects (perpetual diff or type error on `custom_fields`), `config_context` always present on devices/VMs, and `netbox_service` `protocol`/`ports` returning `null` for multi-protocol services. Test against 4.7 in staging before pinning, and re-check the README matrix.
+> **No provider release declares NetBox 4.7 support yet.** The provider probes the NetBox version at init and emits a non-blocking warning when unsupported. 4.7 changes most likely to bite the v5.x provider: selection custom fields now read back as `{value,label}` objects (perpetual diff or type error on `custom_fields`), `config_context` present by default (omit it with `?omit=config_context` on 4.7.3+) on devices/VMs, and `netbox_service` `protocol`/`ports` returning `null` for multi-protocol services. Test against 4.7 in staging before pinning, and re-check the README matrix.
 >
-> **v6.0.0** (release candidates since 2026-09-26) is a generated rewrite on the Terraform Plugin Framework with breaking changes: `netbox_interface` → `netbox_virtual_machine_interface`, `netbox_device_primary_ip` merged into `netbox_primary_ip`, tags referenced by slug, data-source `filter` blocks → `filters`, custom-field lookups → `custom_field_filters` / `cf_<name>`. Stay on `~> 5.0` for existing state until you plan the migration.
+> **v6.0.0** (release candidates since 2026-09-26; latest **rc.2**, 2026-09-30, with the same support statement — 4.6.8–4.6.10 full, 4.6.7 partial, no 4.7) is a generated rewrite on the Terraform Plugin Framework with breaking changes: `netbox_interface` → `netbox_virtual_machine_interface`, `netbox_device_primary_ip` merged into `netbox_primary_ip`, tags referenced by slug, data-source `filter` blocks → `filters`, custom-field lookups → `custom_field_filters` / `cf_<name>`. Stay on `~> 5.0` for existing state until you plan the migration.
 
 ---
 

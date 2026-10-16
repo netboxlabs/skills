@@ -13,7 +13,7 @@ license: Apache-2.0
 
 Diode is a gRPC-based data ingestion service for NetBox. Instead of managing dependency order and object IDs via the REST API, you describe objects by name and the Diode reconciler resolves dependencies, creates missing objects, and performs upserts automatically.
 
-**This skill covers the open-source Python and Go SDKs** (diode-sdk-python v1.14.1 / diode-sdk-go v1.12.0), targeting NetBox **4.5–4.7**. Both SDKs regenerated their entity set for NetBox 4.7.0 (python 1.14.0 / go 1.12.0). The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
+**This skill covers the open-source Python and Go SDKs** (diode-sdk-python v1.14.2 / diode-sdk-go v1.12.0), targeting NetBox **4.5–4.7**. Both SDKs regenerated their entity set for NetBox 4.7.0 (python 1.14.0 / go 1.12.0). The Diode server and reconciler are proprietary — this skill describes their observable behavior, not internals.
 
 > **Your knowledge of Diode SDK may be outdated.** Entity types, SDK methods, and reconciler behavior evolve between releases. Prefer retrieval over pre-trained knowledge.
 
@@ -279,7 +279,8 @@ except DiodeClientError as e:
 
 - **New entity types:** `CoolingSource`, `CoolingFeed`, `CoolingIntake`, `CoolingOutflow`, `ModuleBayType`, plus a minimal `User` (only used as `RackReservation.user`). Ingest these only against NetBox 4.7 with a matching Diode plugin.
 - **New fields:** `Device.cooling_method`; `DeviceType`/`ModuleType.cooling_method` + `end_of_life`; `ModuleType`/`ModuleBay.module_bay_types`; `Rack`/`RackType.cooling_capability` + `cooling_capacity`; `Interface.channels` + `channel_id` (channelized subinterfaces) and writable `Interface.mac_address`; `Service.port_mappings`. Full list in [references/entity-catalog.md](references/entity-catalog.md#netbox-47-additions).
-- **Reading back what Diode wrote on 4.7:** selection custom fields come back from REST/GraphQL as `{"value": ..., "label": ...}` objects; `config_context` is always present on devices/VMs. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
+- **Reading back what Diode wrote on 4.7:** selection custom fields come back from REST/GraphQL as `{"value": ..., "label": ...}` objects; `config_context` is present by default (omit it with `?omit=config_context` on 4.7.3+) on devices/VMs. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
+- **python 1.14.2 (2026-10-06):** `DIODE_SKIP_TLS_VERIFY=true` now keeps the connection on TLS and skips only certificate verification; earlier releases opened a plaintext channel instead. Details in [references/python-sdk-guide.md](references/python-sdk-guide.md#environment-variables).
 
 ### NetBox 4.6 — SDK python 1.12.0 / go 1.9.0
 

@@ -75,7 +75,7 @@ A plan can target a NetBox branch (needs the NetBox Branching plugin and its per
 - A deployment planned into a branch belongs to that branch, separate from main's deployments, until the branch ends. Designs checks the branch's state when you open the Deployments page or use the branch.
 - **Merged**: the deployment moves to main with everything it owns (NetBox keeps ids across a merge). If main already has an active deployment of the same name and design, the branch's is released instead.
 - **Deleted**: its objects went with the branch; the deployment shows **Branch gone** and can be removed.
-- On **NetBox 4.7.0–4.7.2** a write NetBox rejects inside a branch returns a server error instead of a field error (netbox-community/netbox#23366). Designs retries the objects one at a time so the apply names the object and field refused.
+- On **NetBox 4.7.0–4.7.2** a write NetBox rejects inside a branch returns a server error instead of a field error (netbox-community/netbox#23366, fixed in NetBox **4.7.3**). Designs retries the objects one at a time so the apply names the object and field refused.
 
 See [netbox-branching](../../netbox-branching/SKILL.md) for branch lifecycle and merging.
 

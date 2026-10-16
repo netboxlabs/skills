@@ -6,7 +6,7 @@
 pip install netboxlabs-diode-sdk
 ```
 
-**Requirements:** Python 3.10+, NetBox 4.5+ (covers 4.5–4.7); diode-sdk-python v1.14.1 (entities regenerated for NetBox 4.7.0 in 1.14.0)
+**Requirements:** Python 3.10+, NetBox 4.5+ (covers 4.5–4.7); diode-sdk-python v1.14.2 (entities regenerated for NetBox 4.7.0 in 1.14.0; 1.14.2 keeps TLS when `DIODE_SKIP_TLS_VERIFY` is set)
 
 ## Client Setup
 
@@ -39,6 +39,8 @@ with DiodeClient(
 
 > **Auth endpoint scheme** *(1.13+)*: the token request follows the target scheme — `grpc://`/`http://` targets authenticate over HTTP, `grpcs://`/`https://` over HTTPS — regardless of `DIODE_SKIP_TLS_VERIFY`, which only disables certificate verification.
 
+> **Skip-verify keeps TLS** *(1.14.2+)*: with `DIODE_SKIP_TLS_VERIFY=true` a `grpcs://`/`https://` target stays TLS-encrypted and only certificate verification is skipped — including through an HTTP `CONNECT` proxy. 1.14.1 and earlier opened a plaintext channel instead. The SDK achieves this through a private local Unix-socket listener; where Unix sockets are unavailable (Windows) the client raises `DiodeConfigError` unless `DIODE_SKIP_TLS_VERIFY_ALLOW_LOOPBACK=true` accepts an unprotected loopback port. Dev/break-glass only: the server is no longer authenticated.
+
 ### Environment Variables
 
 | Variable | Purpose | Default |
@@ -47,7 +49,8 @@ with DiodeClient(
 | `DIODE_CLIENT_SECRET` | OAuth2 client secret | (required) |
 | `DIODE_SDK_LOG_LEVEL` | Log level | INFO |
 | `DIODE_CERT_FILE` | Custom TLS certificate path | (none) |
-| `DIODE_SKIP_TLS_VERIFY` | Skip TLS verification (dev only) | false |
+| `DIODE_SKIP_TLS_VERIFY` | Skip TLS *certificate* verification on `grpcs://`/`https://` targets (dev only; connection stays encrypted on 1.14.2+) | false |
+| `DIODE_SKIP_TLS_VERIFY_ALLOW_LOOPBACK` *(1.14.2+)* | Allow a loopback port for the skip-verify tunnel where Unix sockets are unavailable (Windows) | false |
 | `DIODE_SENTRY_DSN` | Sentry error reporting | (none) |
 | `DIODE_DRY_RUN_OUTPUT_DIR` | Dry run output directory | (none) |
 | `DIODE_MAX_AUTH_RETRIES` | Max attempts for token fetch and gRPC re-auth (see [Auth Backoff](#auth-backoff)) | 3 |

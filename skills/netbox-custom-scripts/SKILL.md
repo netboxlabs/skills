@@ -300,7 +300,7 @@ If `run()` is not overridden, NetBox executes `pre_run()` → all `test_*` metho
 - `CustomField.objects.get_for_model()` / `obj.custom_fields` return a **list of active fields**, not a queryset. Custom field create-with-default and delete are deferred to a background job above `BULK_UPDATE_CHUNK_SIZE`; such fields have `status` `provisioning`/`deleting` and are omitted from `get_for_model()` until done.
 - Hierarchical models moved from MPTT to PostgreSQL `ltree`: `level` no longer filterable/orderable; `get_root()`, `get_family()`, `is_leaf_node()`, `move_to()`, `insert_at()` removed.
 - Global search index updates deferred to a background job (brief lag after create/update).
-- Upgrade prerequisites: PostgreSQL 15+, Redis 6.0+, `ltree` extension. Recommend **4.7.2+** (4.7.0/4.7.1 recorded plaintext API tokens created via background bulk requests in job results).
+- Upgrade prerequisites: PostgreSQL 15+, Redis 6.0+, `ltree` extension. Recommend **4.7.3+** (4.7.0/4.7.1 recorded plaintext API tokens created via background bulk requests in job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation).
 
 ### NetBox 4.6 (2026-05-05)
 

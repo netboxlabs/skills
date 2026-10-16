@@ -110,7 +110,7 @@ The enrichment object does **not** carry manufacturer/model — reach it through
 ```bash
 POST /api/plugins/ndx/import/  {"ndx_ids": ["arista/dcs-7050sx3-48yc8", "cisco/nexus-93180yc-fx3"]}
 ```
-≤5 ids import synchronously and return per-id `{success, message, created, updated}`; >5 ids queue a background job (`202`). After import the type is a normal NetBox DeviceType with component templates plus (on paid tier) enrichment.
+≤5 ids import synchronously and return per-id `{success, message, created, updated}`; >5 ids queue a background job (`202`). After import the type is a normal NetBox DeviceType/ModuleType/RackType with component templates plus (on paid tier) enrichment. Import needs the same `add` permission as creating the object directly (`dcim.add_devicetype` / `add_moduletype` / `add_racktype`). *(plugin 0.8.1+)* A device-type import also creates `InventoryItemTemplate`s from the DTL `inventory-items` list (device types only) and links front ports to rear ports with positions from the DTL `port-mappings` list.
 
 ```bash
 POST /api/plugins/ndx/sync/   {}     # 202; flags update_available, does not apply changes
@@ -175,6 +175,7 @@ Full sequences in [references/consume-workflows.md](references/consume-workflows
 - **EOL/EOS exposure report:** pull deployed devices from `GET /api/dcim/devices/`, collect their `device_type` ids, match each to its NDX import record, flag types past/near `eos_date`/`last_support_date`, present with provenance. *(4.7)* Also read core `DeviceType.end_of_life` and reconcile the two (see above).
 - **Populate observability config:** read `snmp_sys_object_id`, `extensions_data.snmp.mibs[]`, or `extensions_data.gnmi`/`.netconf`/`.redfish` to drive *what* to poll (NDX gives the what/how, not the config).
 - **Import a catalog entry:** `POST import/` with the `ndx_id`(s).
+- **Discovery created a duplicate of an NDX device type** (NDX type has zero devices; a second type under the same manufacturer has the vendor PID as `model`): see W7 in the workflows reference — plugin 0.8.0+ ships a dry-run-by-default merge command; without shell access, re-point devices by hand.
 
 ## Access Tiers (concept level)
 
@@ -197,13 +198,22 @@ So a `has_lifecycle: true` with empty lifecycle fields is a tier-gating signal, 
 9. **Expecting deep protocol data as columns.** It's inside `extensions_data` keyed by protocol.
 10. **Expecting `sync/` to update data.** Sync only flags updates; applying requires re-import.
 11. **Treating NDX as instance/monitoring data.** It is device-**type** reference metadata only.
+12. **Creating a second device type keyed by the vendor PID.** NDX stores the marketing name in `model` and the PID in `part_number`; a type created with the PID as `model` (what Discovery/Diode did before its fix) is a duplicate that orphans the NDX enrichment. Match on `part_number` before creating a type.
 
 ## Version Notes
 
+### NDX plugin 0.8.x (2026-10)
+
+Current plugin **0.8.3** (2026-10-15); declares NetBox 4.5.0+ (manifest 4.5–4.7). `populate_core_end_of_life` default unchanged.
+
+- **0.8.0** — `ndx_remediate_duplicates` management command merges Discovery-created duplicate device types back onto the NDX type they collided with (dry run by default; `--apply --user <name>`; W7 in the workflows reference). NDX provenance changes now render in `GET /api/core/object-changes/` as `{id, field, source, provenance_type, confidence, retrieved, note}` — before 0.8.0 any changelog page containing a provenance change returned 500.
+- **0.8.1** — Device-type imports create `InventoryItemTemplate`s from the DTL `inventory-items` list (device types only; module types have no inventory item templates). Front↔rear port mappings are read from the DTL `port-mappings` list, including `front_port_position`, so multi-position front ports map correctly on NetBox 4.5+.
+- **0.8.2 / 0.8.3** — Plugin manifest and docs only; the catalog **Type** filter is documented as Device / Module / Rack Types, and import enforces the matching `add` permission per kind.
+
 ### NetBox 4.7 (2026-09-02)
 
-- Core `end_of_life` (date) and `cooling_method` on `DeviceType`/`ModuleType`; `cooling_capability`/`cooling_capacity` on Rack/RackType; full cooling models (sources, feeds, intakes, outflows). NDX enrichment stays the sourced, multi-date lifecycle and thermal record; NDX plugin 0.7.0+ writes core `end_of_life` from `last_support_date` on import (setting `populate_core_end_of_life`, default on; strict dates only; local edits preserved) and does not write `cooling_method`. NDX plugin 0.7.1 declares NetBox 4.5–4.7 compatibility.
-- `GET /api/dcim/devices/` always includes `config_context` on 4.7 (`?exclude=config_context` is ignored) — keep `?fields=id,name,device_type` on the exposure-report pull.
+- Core `end_of_life` (date) and `cooling_method` on `DeviceType`/`ModuleType`; `cooling_capability`/`cooling_capacity` on Rack/RackType; full cooling models (sources, feeds, intakes, outflows). NDX enrichment stays the sourced, multi-date lifecycle and thermal record; NDX plugin 0.7.0+ writes core `end_of_life` from `last_support_date` on import (setting `populate_core_end_of_life`, default on; strict dates only; local edits preserved) and does not write `cooling_method`. NDX plugin 0.7.1+ declares NetBox 4.5–4.7 compatibility (current 0.8.3).
+- `GET /api/dcim/devices/` loads `config_context` on 4.7 unless the request leaves it out (`?exclude=config_context` is ignored on every 4.7.x; `?fields=`/`?omit=` skip the DB work again on 4.7.3+) — keep `?fields=id,name,device_type` on the exposure-report pull.
 - Selection custom fields read as `{"value", "label"}` — matters only if you store NDX-derived values in custom fields on 4.5–4.6 instances and compare them.
 
 ## References

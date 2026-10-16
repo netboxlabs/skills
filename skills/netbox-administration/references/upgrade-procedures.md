@@ -11,7 +11,7 @@
 | 4.3 | 3.10–3.12 | 14+ | 5.0+ | 5.x |
 | 4.2 | 3.10–3.12 | 13+ | 4.0+ | 5.x |
 
-> **4.7 platform shifts:** PostgreSQL 15+ is now **required** — a `core` system check fails the `migrate` step on 14, where 4.6 only warned. Redis 5.x dropped. Django 6.1. Run **≥4.7.2**: 4.7.0/4.7.1 recorded the plaintext of tokens created via background bulk requests in job results, and 4.7.0 `pg_dump` output lost the ltree cascade triggers on restore. See [Upgrading to 4.7](#upgrading-to-47).
+> **4.7 platform shifts:** PostgreSQL 15+ is now **required** — a `core` system check fails the `migrate` step on 14, where 4.6 only warned. Redis 5.x dropped. Django 6.1. Run **≥4.7.3**: 4.7.0/4.7.1 recorded the plaintext of tokens created via background bulk requests in job results, 4.7.0 `pg_dump` output lost the ltree cascade triggers on restore, and 4.7.3 adds branch-safe background bulk writes plus the config-context omit optimisation. See [Upgrading to 4.7](#upgrading-to-47).
 > **4.6 platform shifts:** Django 6.0 (was 5.x) and PostgreSQL 14 deprecated. Run **≥4.6.1** to avoid the template `environment_params` RCE (CVE-2026-29514) present in 4.6.0.
 
 ## Pre-Upgrade Checklist

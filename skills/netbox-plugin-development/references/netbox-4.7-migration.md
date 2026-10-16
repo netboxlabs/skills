@@ -17,7 +17,7 @@ plugin must keep working on 4.5/4.6 *and* 4.7 (each row shows the version-safe f
 | `CustomFieldsMixin.populate_custom_field_defaults()` | — | Obsolete; delete the call |
 | `OwnerMixin` automatic reverse relation (`owner.accesslist_set`) | Query forward: `AccessList.objects.filter(owner=owner)` | The `owner` FK now uses `related_name='+'` |
 | Django `EMAIL_HOST`/`EMAIL_PORT`/`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD`/`EMAIL_USE_TLS`/… settings; `EMAIL_BACKEND` | `django.core.mail.send_mail()` or `EmailMessage(...).send()` on the default connection | NetBox populates Django's `MAILERS` instead. `get_connection(backend=...)` with an explicit backend raises `RuntimeError`. Sending requires `EMAIL['SERVER']` in `configuration.py` (else `InvalidMailer`) |
-| `DeviceWithConfigContextSerializer`, `VirtualMachineWithConfigContextSerializer` | `DeviceSerializer` / `VirtualMachineSerializer` | `config_context` is now always present; `?exclude=config_context` is ignored |
+| `DeviceWithConfigContextSerializer`, `VirtualMachineWithConfigContextSerializer` | `DeviceSerializer` / `VirtualMachineSerializer` | `config_context` is now present by default (`?omit=config_context`/`?fields=` skip loading it from 4.7.3); `?exclude=config_context` is ignored |
 | Webhook context `request_id`, `username`; `send_webhook(username=...)` | `request.id`, `request.user` | Drain RQ queues before upgrading — queued webhook jobs from 4.6 fail with `TypeError` |
 | `JINJA2_FILTERS` (config parameter) | `JINJA_FILTERS` | Old name works until 5.0 |
 | `MPTTColumn` (deprecated, removed in 5.0) | `columns.TreeColumn` | `MPTTColumn` still works on 4.5–4.7 as an alias |

@@ -99,7 +99,7 @@ Use cases: CI/CD bootstrapping, dynamic environment provisioning, token rotation
 ## NetBox 4.7 Token Changes
 
 - **`token` is read-only on create.** `POST /api/users/tokens/` always generates the plaintext; a client-supplied `token` value is ignored. Generate-then-distribute flows must read the plaintext from the response.
-- **Never create tokens with `?background=true`.** 4.7.0 and 4.7.1 stored the plaintext of tokens created via background bulk requests in the job result, readable by any user with `core.view_job`. 4.7.2 rejects such requests with 400. Run **≥ 4.7.2**; treat any token created that way on 4.7.0/4.7.1 as exposed — revoke and replace it, then delete the job records.
+- **Never create tokens with `?background=true`.** 4.7.0 and 4.7.1 stored the plaintext of tokens created via background bulk requests in the job result, readable by any user with `core.view_job`. 4.7.2 rejects such requests with 400. Run **≥ 4.7.3** (4.7.3 also adds branch-safe background writes and the config-context omit optimisation); treat any token created that way on 4.7.0/4.7.1 as exposed — revoke and replace it, then delete the job records.
 - **Custom script execution needs a write-enabled token.** `POST /api/extras/scripts/<id>/` returns 403 for a token with write ability disabled, even if the user could run the script in the UI.
 
 ## IP Restrictions

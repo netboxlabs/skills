@@ -141,16 +141,16 @@ Use local context sparingly — for true per-device exceptions only.
 
 ### Bulk Operations
 
-> **NetBox 4.7+**: the merged result is pre-rendered and cached on the device/VM (see below), so list endpoints no longer compute it per object and `config_context` is **always** included. `?exclude=config_context` is **silently ignored** — sending it is harmless but does nothing.
+> **NetBox 4.7+**: the merged result is pre-rendered and cached on the device/VM (see below), so list endpoints no longer compute it per object. `?exclude=config_context` is **silently ignored** on every 4.7.x — sending it is harmless but does nothing. On 4.7.0–4.7.2 `config_context` is always loaded; on **4.7.3+** `?omit=config_context` (or `?fields=` without it, `?brief=True`) skips the DB annotation and the cached column again, so send it on list reads that don't need the merged data.
 
-**NetBox 4.5/4.6**: config context computation per device is expensive on list endpoints. Always use `?exclude=config_context` on device/VM list endpoints when you don't need the merged config context:
+**NetBox 4.5/4.6**: config context computation per device is expensive on list endpoints. Always use `?omit=config_context` (4.5.2+; `?exclude=config_context` is equivalent there) on device/VM list endpoints when you don't need the merged config context:
 
 ```python
 # Slow on 4.5/4.6 — computes config context for every device
 devices = requests.get(f"{NETBOX}/api/dcim/devices/", headers=headers)
 
-# Fast on 4.5/4.6 — skips config context computation (ignored on 4.7, still safe to send)
-devices = requests.get(f"{NETBOX}/api/dcim/devices/?exclude=config_context", headers=headers)
+# Fast on 4.5/4.6 — skips the computation; payload-only on 4.7.0–4.7.2; skips the DB annotation on 4.7.3+
+devices = requests.get(f"{NETBOX}/api/dcim/devices/?omit=config_context", headers=headers)
 ```
 
 ### Pre-Rendered Cache (NetBox 4.7+)

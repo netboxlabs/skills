@@ -39,7 +39,7 @@ You should see a paginated list of branches (or empty results). If you get 404, 
 
 | NetBox | Plugin line | Latest |
 |--------|-------------|--------|
-| **4.7.x** | **1.2.x** (`min_version 4.7.0`; will not load on ≤4.6) | 1.2.1 (2026-09-09) |
+| **4.7.x** | **1.2.x** (`min_version 4.7.0`; will not load on ≤4.6) | 1.2.2 (2026-10-08) |
 | **4.4.1–4.6.x** | **1.1.x** (will not load on 4.7) | 1.1.3 (2026-08-26) |
 
 1.0.x/0.9.x are superseded — upgrade to 1.1.x before moving to NetBox 4.7, then to 1.2.x with the NetBox upgrade. Coverage window for this skill: NetBox 4.5–4.7.
@@ -109,7 +109,7 @@ Other methods (UI only, not for API automation):
 - Cookie: `active_branch=<schema_id>`
 - Query param: `?_branch=<schema_id>`
 
-Branch must be in `ready` state or the request returns 400.
+Branch must be in `ready` state or the request is rejected — *(1.2.2+)* 400 `Selected branch is not ready.` (a 500 before 1.2.2). The response deliberately names neither the branch nor its status (it is returned ahead of REST authentication), so poll the branch's `status` and wait for `ready`.
 
 ### Make Changes in Branch
 
@@ -240,7 +240,7 @@ When integrated, merges are blocked if the associated CR isn't approved. Via RES
 
 ## Anti-Patterns
 
-1. **Always poll after creation** — branch isn't usable until `ready`. Using it in `provisioning` returns 400.
+1. **Always poll after creation** — branch isn't usable until `ready`. Using it in `provisioning` returns 400 `Selected branch is not ready.` *(1.2.2+; a 500 before)* — the response doesn't say which branch, so check `status`.
 2. **Stale branches** — a branch whose `last_sync` (or `created`, if never synced) is older than NetBox's `CHANGELOG_RETENTION` (default 90 days) is stale and can no longer sync: the sync job errors with `Syncing this branch is not permitted.` The REST representation has **no** `is_stale`/`stale_warning` fields — compute `now − (last_sync or created)` yourself; the UI warns `stale_warning_threshold` days ahead (default 7). Sync before retention expires or archive/delete.
 3. **Max branch limits** — plugin config sets `max_branches` (total non-archived) and `max_working_branches`. Creation fails with ValidationError if exceeded.
 4. **Cannot delete the active branch** — deactivate first.
@@ -250,7 +250,7 @@ When integrated, merges are blocked if the associated CR isn't approved. Via RES
 8. **Schema = disk space** — each branch copies all branchable tables. Plan capacity for large databases.
 9. **`pending-migrations`** — after NetBox upgrades, existing branches need migration before use.
 10. **DB privileges** — the PostgreSQL user needs `CREATE ON DATABASE` for schema creation (NetBox 4.7 needs the same privilege to auto-install the `ltree` extension).
-11. **`?background=true` + `X-NetBox-Branch` writes to main** *(NetBox 4.7)* — see [NetBox 4.7 Interactions](#netbox-47-interactions).
+11. **`?background=true` + `X-NetBox-Branch` writes to main** *(NetBox 4.7.0–4.7.2; fixed in 4.7.3)* — see [NetBox 4.7 Interactions](#netbox-47-interactions).
 12. **Programmatic writes need `obj.snapshot()`** — scripts, `nbshell`, and plugin jobs that mutate objects in a branch without a pre-change snapshot get empty `prechange_data`: the diff can't render before/after and **conflict detection silently no-ops** for that object. Call `snapshot()` before mutating.
 
 ## API Endpoints Summary
@@ -272,12 +272,12 @@ When integrated, merges are blocked if the associated CR isn't approved. Via RES
 
 Requires branching **1.2.x**. Verified against NetBox 4.7.2 + plugin 1.2.1.
 
-- **`?background=true` bulk writes ignore the branch header.** The worker rebuilds the request from a snapshot that carries only host/forwarding headers — `X-NetBox-Branch`, cookies, and `?_branch=` are dropped — so the deferred bulk write runs with **no branch active** and lands in **main** (or, with Changes `protect_main`, is rejected). Never combine `?background=true` with `X-NetBox-Branch`; send synchronous bulk requests (≤ a few hundred objects per call) in branch context instead.
+- **`?background=true` bulk writes ignore the branch header on NetBox 4.7.0–4.7.2.** Those releases rebuild the request in the worker from a snapshot that carries only host/forwarding headers — `X-NetBox-Branch`, cookies, and `?_branch=` are dropped — so the deferred bulk write runs with **no branch active** and lands in **main** (or, with Changes `protect_main`, is rejected). **NetBox 4.7.3+** carries the request headers and query string (minus `background`; `Authorization` is stripped — auth already happened) into the worker, so the write lands in the branch (netbox-community/netbox#23247). On ≤ 4.7.2 never combine `?background=true` with `X-NetBox-Branch` — send synchronous bulk requests (≤ a few hundred objects per call) in branch context instead; on 4.7.3+ poll the job to a terminal status as for any background write.
 - **Hierarchies inside branches:** NetBox 4.7 keeps region/site-group/location/tenant-group/module-bay paths in `ltree` columns maintained by DB triggers. 1.2.0 installs those triggers in each branch schema, so moving or renaming a parent in a branch cascades to descendants in the branch only, and merges replay the parent change (paths on main are recomputed by main's triggers). If you restored NetBox 4.7.0 from `pg_dump`, run `rebuild_ltree_paths --check` on main *before* provisioning new branches — branches copy main's tables and triggers as-is.
 - **Custom Objects plugin ≥ 0.6** supports branching custom-object *instances* (version-gated on the plugin, not NetBox); 0.5.x rejects instance writes in a branch. See [netbox-custom-objects](../netbox-custom-objects/SKILL.md).
 - **Bulk error shape:** a failed synchronous bulk write in branch context returns 4.7's per-object `{"detail", "errors": [{"index": N, ...}]}` form — same as main. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
 - **NetBox Designs plans into branches.** A design deployment aimed at a branch writes only to that branch; merge or delete the branch in NetBox as usual, and the deployment follows (moves to main, or shows *Branch gone*). See [netbox-designs](../netbox-designs/SKILL.md).
-- **pynetbox ≥ 7.8.0** ships a `BranchingExtension` (`branch.sync()/merge()/revert()/archive()`) alongside the older `nb.activate_branch()` context manager — see [references/api-patterns.md](references/api-patterns.md#pynetbox).
+- **pynetbox ≥ 7.8.0** ships a `BranchingExtension` (`branch.sync()/merge()/revert()/archive()`) alongside the older `nb.activate_branch()` context manager. Run **≥ 7.9.0** (2026-10-08; Python 3.12+) on NetBox 4.7 — the first pynetbox release to declare 4.7 support, and it fixes saves of objects with multi-selection custom fields — see [references/api-patterns.md](references/api-patterns.md#pynetbox).
 
 ## Configuration Quick Reference
 
@@ -299,9 +299,13 @@ Also add `'netbox_branching.events.add_branch_context'` **before** `extras.event
 
 ## Version Notes
 
+### NetBox 4.7.3 (2026-10-13)
+- `?background=true` bulk writes now carry `X-NetBox-Branch` / `?_branch=` into the worker, so background bulk writes land in the branch (#23247; on 4.7.0–4.7.2 they landed in main). Run ≥ 4.7.3.
+
 ### Plugin 1.2.x — NetBox 4.7 only (2026-09-02)
-- **1.2.0:** ltree + denormalization triggers replicated into branch schemas. Requires NetBox ≥ 4.7.0; run ≥ 4.7.2 (4.7.0/4.7.1 leaked plaintext tokens created via background bulk requests into job results).
+- **1.2.0:** ltree + denormalization triggers replicated into branch schemas. Requires NetBox ≥ 4.7.0; run ≥ 4.7.3 (4.7.0/4.7.1 leaked plaintext tokens created via background bulk requests into job results; 4.7.3 carries the branch header into background bulk jobs and restores the config-context omit optimisation).
 - **1.2.1:** stuck-branch recovery — `recover/` endpoint, `auto_recover_stuck_branches`, `stuck_job_grace_period`; `ObjectChange.undo()` fix for restoring deleted objects on revert.
+- **1.2.2** (2026-10-08): cable paths recalculated after a squash merge or revert (#469); merge failure reports include the underlying validation error (#632); the conflict baseline advances when a branch is synced (#640); circular DELETE dependencies broken during squash merges (#668); a branch is deprovisioned before its record is deleted (#641); scripts skip branch activation when the plugin is not installed (#649).
 
 ### Plugin 1.1.x — NetBox 4.4.1–4.6.x (2026-06 → 2026-08)
 - **1.1.0:** parallel provisioning (`provision_workers`), up to ~4× faster on large DBs.
@@ -310,7 +314,7 @@ Also add `'netbox_branching.events.add_branch_context'` **before** `extras.event
 - **1.1.3:** conflicts are now recorded on `ChangeDiff` during object updates (previously some update conflicts were missed).
 
 ### Plugin 1.0.x (superseded)
-- 1.0.4: sync-time conflict resolution preserved at merge; plugin resolver hook for non-change-logged models. 1.0.5: unmodified JSON dict keys preserved on merge. All 1.0.x → upgrade to 1.1.3 (≤4.6) or 1.2.1 (4.7).
+- 1.0.4: sync-time conflict resolution preserved at merge; plugin resolver hook for non-change-logged models. 1.0.5: unmodified JSON dict keys preserved on merge. All 1.0.x → upgrade to 1.1.3 (≤4.6) or 1.2.2 (4.7).
 
 ## References
 
