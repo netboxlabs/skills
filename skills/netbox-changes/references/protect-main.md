@@ -45,13 +45,15 @@ to allow the merge writes to proceed normally. Migrations are also exempt.
 
 ## Background Bulk Requests (NetBox 4.7)
 
-`?background=true` defers a bulk REST write to a worker job. The worker rebuilds
-the request without `X-NetBox-Branch` (only host/forwarding headers survive), so
-the write executes with **no active branch**. With protect_main on, the job fails
-with `Changes directly to main are not permitted.` even though the original
-request returned 202; with protect_main off, the write lands in main. Either
-way: never use `?background=true` for work meant for a branch. Synchronous bulk
-writes with the branch header behave normally.
+`?background=true` defers a bulk REST write to a worker job. On NetBox **4.7.0–4.7.2**
+the worker rebuilds the request without `X-NetBox-Branch` (only host/forwarding
+headers survive), so the write executes with **no active branch**. With protect_main
+on, the job fails with `Changes directly to main are not permitted.` even though the
+original request returned 202; with protect_main off, the write lands in main. Either
+way, on those releases never use `?background=true` for work meant for a branch.
+Synchronous bulk writes with the branch header behave normally. **NetBox 4.7.3+**
+carries the request headers and query string into the job
+(netbox-community/netbox#23247), so background bulk writes run in the branch.
 
 ## Combined with Merge Gating
 

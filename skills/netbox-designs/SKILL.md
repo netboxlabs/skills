@@ -251,7 +251,7 @@ Report for this design: add `devices/Cisco_3850_w_module` and `devices/Dell_R640
 
 ### Designs preview (NetBox Cloud, 2026)
 - Requires **NetBox 4.6.0+** on the target, a **v2 `nbt_` token with write enabled** whose user can view the changelog and manage the object types the designs describe; v1 tokens are refused.
-- Planning into a branch needs the NetBox Branching plugin and its permissions. On **NetBox 4.7.0–4.7.2** a write NetBox rejects inside a branch surfaces as a server error (netbox-community/netbox#23366); Designs retries one object at a time so the apply reports the real field error.
+- Planning into a branch needs the NetBox Branching plugin and its permissions. On **NetBox 4.7.0–4.7.2** a write NetBox rejects inside a branch surfaces as a server error (netbox-community/netbox#23366, fixed in **4.7.3**); Designs retries one object at a time so the apply reports the real field error.
 - Not yet supported: custom fields, custom objects, plugin models, typed variables, variable loop bounds, allocation, renaming designs or deployments, NDX device types. Planned for general availability: typed variables, NDX types, keeping an object through a move.
 - Every design declares `netbox_versions`; the tutorial designs declare `["4.6.*", "4.7.*"]`.
 

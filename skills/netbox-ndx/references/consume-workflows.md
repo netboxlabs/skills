@@ -56,7 +56,9 @@ POST /api/plugins/ndx/import/  {"ndx_ids": ["arista/dcs-7050sx3-48yc8"]}
 - >5 ids: queues a background job (`202 {"status":"queued","count":N}`); poll `import-records/` (or NetBox jobs) for completion.
 - `ndx_id` format is `vendor_slug/slug`. Bad format or unknown id is reported per-id in the results.
 
-After import, the type is a standard NetBox `DeviceType`/`ModuleType`/`RackType` with full component templates; its manufacturer is auto-created. Re-import merges/updates — it never duplicates or deletes existing components.
+After import, the type is a standard NetBox `DeviceType`/`ModuleType`/`RackType` with full component templates; its manufacturer is auto-created. Re-import merges/updates — it never duplicates or deletes existing components. The caller needs the same `add` permission as creating the object directly (`dcim.add_devicetype`, `dcim.add_moduletype`, `dcim.add_racktype`).
+
+Components a device-type import creates: console ports, console server ports, power ports, power outlets (linked to their inlet), interfaces (incl. bridge links, PoE, `rf_role`), front/rear ports with `positions`, module bays, device bays, and *(plugin 0.8.1+)* inventory item templates from the DTL `inventory-items` list plus front↔rear `PortTemplateMapping`s from the DTL `port-mappings` list (`front_port_position`/`rear_port_position` honoured). Module types get the same minus inventory items and bays. A mapping whose port names cannot be resolved is reported in the per-id `message`, not a failed import. Types imported before 0.8.1 pick up inventory items and port mappings on re-import.
 
 ## W6 — Check for catalog updates
 
@@ -67,3 +69,12 @@ Sync **only flags** `update_available=true` on records that have a newer catalog
 ```bash
 GET /api/plugins/ndx/import-records/?update_available=true
 ```
+
+## W7 — Audit enrichment changes through the changelog *(plugin 0.8.0+)*
+
+Import records, enrichments and provenance entries are change-logged. To see what a re-import or sync changed:
+```bash
+GET /api/core/object-changes/?changed_object_type=netbox_ndx.ndxenrichment&changed_object_id=<id>
+GET /api/core/object-changes/?changed_object_type=netbox_ndx.ndxprovenance
+```
+A provenance change renders `changed_object` as `{id, field, source, provenance_type, confidence, retrieved, note}` — no `url`, because provenance has no endpoint of its own; read the current entries through the parent enrichment. On plugins before 0.8.0 any changelog page that contained a provenance change returned HTTP 500 — if an unfiltered `object-changes/` call 500s on an older instance, exclude that type or upgrade.

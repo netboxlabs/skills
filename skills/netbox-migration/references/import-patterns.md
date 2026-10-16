@@ -106,7 +106,7 @@ with open("devices.csv") as f:
             device.save()
 ```
 
-**Performance:** Use `?brief=True` for lookups, batch bulk creates (~100/request — a tuning choice, not a NetBox limit), cache site/type lookups. On NetBox **4.6+** use cursor pagination (`?start=`) instead of deep `?offset=` when reading back large sets for validation, and add `?fields=` to project only the columns you need. Trimming `config_context` on device/VM reads: **4.5–4.6** send `?exclude=config_context`; **4.7+** ignores that parameter (config context is pre-rendered and always included) — `?fields=`/`?brief=True` is the way to keep read-back payloads small. Details: [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+**Performance:** Use `?brief=True` for lookups, batch bulk creates (~100/request — a tuning choice, not a NetBox limit), cache site/type lookups. On NetBox **4.6+** use cursor pagination (`?start=`) instead of deep `?offset=` when reading back large sets for validation, and add `?fields=` to project only the columns you need. Trimming `config_context` on device/VM reads: send `?omit=config_context` (4.5.2+) — it skips the per-object render on **4.5–4.6**, only trims the payload on **4.7.0–4.7.2** (cached), and skips the DB annotation again on **4.7.3+** (as do `?fields=`/`?brief=True`); `?exclude=config_context` is ignored on every 4.7.x. Details: [netbox-api-integration](../../netbox-api-integration/SKILL.md).
 
 ### Bulk write errors and background jobs (NetBox 4.7+)
 
@@ -137,7 +137,7 @@ for row, errors in failures:
     print(f"row {row and row['hostname']}: {errors}")   # fix in source, re-run the batch
 ```
 
-Large batches that risk proxy/gateway timeouts can be deferred to a worker with `?background=true`: the request returns **202** with `{"job": {"id", "url", "status"}}`, validation happens in the worker, and you must poll the job (`GET /api/core/jobs/<id>/`) until `status` is `completed` (or `errored`/`failed`) and read the captured response in `data`. Never create API tokens this way — run **≥ 4.7.2**. Polling pattern: [netbox-api-integration](../../netbox-api-integration/references/rest-api-patterns.md#background-processing-netbox-47).
+Large batches that risk proxy/gateway timeouts can be deferred to a worker with `?background=true`: the request returns **202** with `{"job": {"id", "url", "status"}}`, validation happens in the worker, and you must poll the job (`GET /api/core/jobs/<id>/`) until `status` is `completed` (or `errored`/`failed`) and read the captured response in `data`. Never create API tokens this way — run **≥ 4.7.3** (4.7.0/4.7.1 leaked token plaintexts into job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation). Polling pattern: [netbox-api-integration](../../netbox-api-integration/references/rest-api-patterns.md#background-processing-netbox-47).
 
 **Custom fields (NetBox 4.7+):** write the raw value (`"custom_fields": {"environment": "prod"}`); on read-back a selection field comes back as `{"value": "prod", "label": "Production"}` — compare `["value"]` when verifying. **Services (4.7+):** send `"port_mappings": ["tcp/443", "udp/53"]` instead of `protocol` + `ports` (the legacy pair is still accepted on 4.7, removed in 5.0; on 4.5–4.6 only the legacy pair exists).
 
@@ -187,7 +187,7 @@ with DiodeClient(
 
 **Advantages:** No dependency ordering, upsert semantics, slug auto-generation, high throughput.
 
-**Limitations:** Write-only (use REST API to verify), case-sensitive matching, less attribute control, requires Diode server. Match the SDK to the NetBox target — the ingester was regenerated for NetBox 4.7 in diode-sdk-python 1.14.0 / diode-sdk-go 1.12.0 (current: 1.14.1 / 1.12.0).
+**Limitations:** Write-only (use REST API to verify), case-sensitive matching, less attribute control, requires Diode server. Match the SDK to the NetBox target — the ingester was regenerated for NetBox 4.7 in diode-sdk-python 1.14.0 / diode-sdk-go 1.12.0 (current: 1.14.2 / 1.12.0).
 
 For full Diode patterns, see [netbox-diode](../../netbox-diode/SKILL.md).
 

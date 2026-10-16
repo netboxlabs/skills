@@ -4,19 +4,21 @@ Detailed reference for NetBox API performance tuning.
 
 ## Critical: Config Context on Device/VM Lists
 
-**The single most impactful optimization on NetBox 4.5–4.6 — and a no-op on 4.7+.**
+**The single most impactful optimization on NetBox 4.5–4.6; a payload-only trim on 4.7.0–4.7.2; a real (smaller) DB saving again on 4.7.3+.**
 
 | Version | Behavior | Do this |
 |---------|----------|---------|
-| 4.5–4.6 | Rendered per object on every request: hierarchy walk, rule evaluation at each level, merge, JSON serialization | `?exclude=config_context` on every device/VM list (or `?omit=config_context`, 4.5.2+) |
-| 4.7+ | Pre-rendered and cached on the object, invalidated and re-rendered by a background job; always included; `?exclude=config_context` **silently ignored** | Nothing for speed. Use `?fields=`, `?brief=True`, or `?omit=config_context` to cut payload size |
+| 4.5–4.6 | Rendered per object on every request: hierarchy walk, rule evaluation at each level, merge, JSON serialization | `?omit=config_context` (4.5.2+) or `?exclude=config_context` on every device/VM list |
+| 4.7.0–4.7.2 | Pre-rendered and cached on the object, invalidated and re-rendered by a background job; always loaded; `?exclude=config_context` **silently ignored** | Nothing for speed. `?fields=`, `?brief=True`, or `?omit=config_context` cut payload size only |
+| 4.7.3+ | Still cached, but list/detail reads that leave `config_context` out of the field set (`?omit=config_context`, `?fields=` without it, `?brief=True`) skip the DB annotation and defer the cached column; `?exclude=` still ignored | `?omit=config_context` when you don't need it — less gain than on 4.6, but measurable on large fleets |
 
 ```python
 # 4.5–4.6: 10-100x slower without the exclude
 requests.get(f"{API_URL}/dcim/devices/", headers=headers)
-requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)
+requests.get(f"{API_URL}/dcim/devices/?exclude=config_context", headers=headers)   # no-op on every 4.7.x
 
-# 4.5.2 through 4.7: one form that skips rendering on 4.5/4.6 and trims the payload on 4.7
+# 4.5.2 through 4.7: the version-portable form — skips rendering on 4.5/4.6, trims the payload
+# on 4.7.0–4.7.2, skips the DB annotation on 4.7.3+
 requests.get(f"{API_URL}/dcim/devices/?omit=config_context", headers=headers)
 ```
 
@@ -151,7 +153,7 @@ def timed_request(session, url):
     print(f"URL: {url}, Status: {response.status_code}, Time: {elapsed:.2f}s, Size: {len(response.content)}B")
     return response
 
-# Compare with and without config_context — a large gap on 4.5–4.6; on 4.7+ only the payload size differs
+# Compare with and without config_context — a large gap on 4.5–4.6; payload size only on 4.7.0–4.7.2; a modest DB saving again on 4.7.3+
 timed_request(session, f"{API_URL}/dcim/devices/?limit=100")
 timed_request(session, f"{API_URL}/dcim/devices/?limit=100&omit=config_context")
 ```
@@ -180,7 +182,7 @@ def debug_graphql(netbox_url, token, query):
 
 ### Common Issues Checklist
 
-1. **Slow device lists?** → On 4.5–4.6 add `?exclude=config_context`. On 4.7+ it is ignored (context is cached) — look at page size, `?q=`, and missing filters instead
+1. **Slow device lists?** → Add `?omit=config_context` (4.5.2+). Decisive on 4.5–4.6; no speed effect on 4.7.0–4.7.2 (context is cached — look at page size, `?q=`, and missing filters instead); skips the config-context DB annotation again on 4.7.3+. `?exclude=` is ignored on all 4.7.x
 2. **Large payloads?** → Use `?brief=True` or `?fields=`
 3. **Slow search?** → Replace `?q=` with specific filters
 4. **GraphQL timeout?** → Check pagination, depth, fan-out

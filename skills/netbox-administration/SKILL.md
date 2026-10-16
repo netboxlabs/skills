@@ -142,7 +142,7 @@ Constraints are evaluated against the **database record**, not the in-memory ins
 > **NetBox 4.5+**: v2 tokens use `Bearer nbt_<key>.<token>` format. Plaintext is never stored (HMAC-SHA256 digest only). Requires `API_TOKEN_PEPPERS` in config. On **4.6.1+** the v2 plaintext token is returned exactly once, in the creation response — capture it then.
 > **v1 tokens** (`Token <plaintext>` format): formally **deprecated in 4.6**, **removed in v5.0**. Migrate all integrations to v2 tokens before upgrading to 5.0.
 
-> **NetBox 4.7+**: the `token` field is **read-only on REST create** — clients can no longer choose the plaintext (any supplied value is ignored). Executing a custom script via REST requires a token with `write_enabled = true`. **4.7.0/4.7.1** recorded the plaintext of tokens created via `?background=true` bulk requests in job results (readable by anyone who can view jobs) — run **≥4.7.2** and replace any token created that way.
+> **NetBox 4.7+**: the `token` field is **read-only on REST create** — clients can no longer choose the plaintext (any supplied value is ignored). Executing a custom script via REST requires a token with `write_enabled = true`. **4.7.0/4.7.1** recorded the plaintext of tokens created via `?background=true` bulk requests in job results (readable by anyone who can view jobs) — run **≥4.7.3** (4.7.3 also adds branch-safe background writes and the config-context omit optimisation) and replace any token created that way.
 
 Token features: `write_enabled` (read-only toggle; *(4.7)* also gates REST script execution), `allowed_ips` (IP restriction), `expires`, `enabled` (soft disable).
 
@@ -177,7 +177,7 @@ See [references/backup-restore.md](references/backup-restore.md) for restore pro
 7. Run `sudo ./upgrade.sh`
 8. Restart services: `sudo systemctl restart netbox netbox-rq`
 
-> **NetBox 4.7**: Python 3.12–3.14, **PostgreSQL 15+ required** (a system check aborts `migrate` on 14), **Redis 6.0+ required**, Django 6.1. The PostgreSQL **`ltree` extension** is required; migrations install it automatically if the NetBox DB user has `CREATE` on the database (`GRANT CREATE ON DATABASE netbox TO netbox;`), or a DBA can pre-install it with `CREATE EXTENSION IF NOT EXISTS ltree;`. The upgrade is **long and effectively irreversible**: the MPTT→ltree migration holds `ACCESS EXCLUSIVE` locks while it backfills, then `rebuild_config_context_cache` issues one `UPDATE` per device/VM — take a backup and plan a maintenance window. Queued `send_webhook` jobs from before the upgrade fail with `TypeError`, so drain queues first. Run **≥4.7.2** (4.7.0/4.7.1 token-plaintext exposure; 4.7.0 `pg_dump` trigger loss).
+> **NetBox 4.7**: Python 3.12–3.14, **PostgreSQL 15+ required** (a system check aborts `migrate` on 14), **Redis 6.0+ required**, Django 6.1. The PostgreSQL **`ltree` extension** is required; migrations install it automatically if the NetBox DB user has `CREATE` on the database (`GRANT CREATE ON DATABASE netbox TO netbox;`), or a DBA can pre-install it with `CREATE EXTENSION IF NOT EXISTS ltree;`. The upgrade is **long and effectively irreversible**: the MPTT→ltree migration holds `ACCESS EXCLUSIVE` locks while it backfills, then `rebuild_config_context_cache` issues one `UPDATE` per device/VM — take a backup and plan a maintenance window. Queued `send_webhook` jobs from before the upgrade fail with `TypeError`, so drain queues first. Run **≥4.7.3** (4.7.0/4.7.1 token-plaintext exposure; 4.7.0 `pg_dump` trigger loss; 4.7.3 branch-safe background writes and config-context omit perf).
 > **NetBox 4.5–4.6**: Python 3.12–3.14, PostgreSQL 14+ (14 **deprecated** in 4.6 — move to 15+ before 4.7), Redis 5.0+. 4.6 runs Django 6.0, 4.5 Django 5.x.
 
 See [references/upgrade-procedures.md](references/upgrade-procedures.md) for step-by-step instructions.
@@ -219,7 +219,7 @@ For large deployments, tune at the PostgreSQL level:
 | Read-only standby can't auth | Sessions stored in DB | Use `SESSION_FILE_PATH` for file-based sessions |
 | Metrics endpoint 404 | `METRICS_ENABLED = False` | Set to `True` and restart |
 | Running NetBox 4.6.0 | RCE via template `environment_params` (CVE-2026-29514) | Run **≥4.6.1**; treat ExportTemplate/config-template edit rights as code-execution-grade and restrict them |
-| Running NetBox 4.7.0/4.7.1 | Plaintext of tokens created via `?background=true` bulk requests recorded in job results | Run **≥4.7.2**; treat such tokens as exposed and replace them |
+| Running NetBox 4.7.0/4.7.1 | Plaintext of tokens created via `?background=true` bulk requests recorded in job results | Run **≥4.7.3** (4.7.3 also brings branch-safe background writes and config-context omit perf); treat such tokens as exposed and replace them |
 | NetBox won't start after 4.7 upgrade (webhook timeout error) | `RQ_DEFAULT_TIMEOUT` ≤ 60 with the default `WEBHOOK_DEFAULT_TIMEOUT = 60` | Set `WEBHOOK_DEFAULT_TIMEOUT` below `RQ_DEFAULT_TIMEOUT` |
 | `InvalidMailer` when NetBox sends mail (4.7) | `EMAIL['SERVER']` not set | Set `EMAIL = {'SERVER': ..., ...}` — Django `EMAIL_*` settings are no longer populated |
 | New/edited objects missing from global search (4.7) | Search index updates deferred to a background job | Ensure `netbox-rq` is running; a brief lag is expected (updates are synchronous only when no worker exists) |
@@ -229,7 +229,7 @@ For large deployments, tune at the PostgreSQL level:
 
 ### NetBox 4.7 (2026-09-02)
 
-- **Platform**: PostgreSQL 15+ with `ltree`, Redis 6.0+, Django 6.1. Long, effectively irreversible upgrade — see [references/upgrade-procedures.md](references/upgrade-procedures.md). Run **≥4.7.2**.
+- **Platform**: PostgreSQL 15+ with `ltree`, Redis 6.0+, Django 6.1. Long, effectively irreversible upgrade — see [references/upgrade-procedures.md](references/upgrade-procedures.md). Run **≥4.7.3** (4.7.0/4.7.1 token leak; 4.7.3 adds branch-safe background writes and the config-context omit optimisation).
 - **Removed**: `housekeeping` management command; `SENTRY_DSN`/`SENTRY_SAMPLE_RATE`/`SENTRY_SEND_DEFAULT_PII`/`SENTRY_TRACES_SAMPLE_RATE` (use `SENTRY_CONFIG`).
 - **Config**: `JINJA2_FILTERS` → `JINJA_FILTERS`; new `WEBHOOK_DEFAULT_TIMEOUT`, `BULK_UPDATE_CHUNK_SIZE`; `EMAIL['SERVER']` mandatory; Django `MAILERS` replaces the `EMAIL_*` settings (plugin code reading `EMAIL_HOST` etc. or calling `get_connection()` with an explicit backend breaks).
 - **Security**: REST token `token` read-only on create; REST script execution needs a write-enabled token; custom link `request` context is a sanitized subset (`id`, `path`, `path_info`, `method`, `GET`, `user` — no cookies, headers, or session); URL custom fields validated against `ALLOWED_URL_SCHEMES` (scheme-less values stored as `https://`).

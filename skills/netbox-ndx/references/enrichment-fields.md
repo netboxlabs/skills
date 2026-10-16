@@ -15,7 +15,7 @@ Dates are **strings**, format `YYYY-MM` or `YYYY-MM-DD`.
 | `eosec_date` | End of security/vulnerability support |
 | `last_support_date` | Last date of support/warranty |
 
-*(NetBox 4.7+)* Core `DeviceType.end_of_life` / `ModuleType.end_of_life` is a single user-maintained `YYYY-MM-DD` date with no provenance; NDX does not document writing it. Closest NDX source: `last_support_date` (then `eos_date`). Expand `YYYY-MM` values before PATCHing.
+*(NetBox 4.7+)* Core `DeviceType.end_of_life` / `ModuleType.end_of_life` is a single `YYYY-MM-DD` date with no provenance. NDX plugin 0.7.0+ writes it from `last_support_date` on import/re-import when that value is a full date (setting `populate_core_end_of_life`, default on; a user-edited value is preserved). A partial `YYYY-MM` date is skipped — expand it yourself before PATCHing, and say so.
 
 ## Thermal (`has_thermal`)
 
@@ -25,7 +25,7 @@ Dates are **strings**, format `YYYY-MM` or `YYYY-MM-DD`.
 | `airflow_cfm` | CFM | |
 | `cooling_type` | — | `air`, `liquid`, `mixed`, `passive` |
 
-*(NetBox 4.7+)* Core `cooling_method` on DeviceType/ModuleType/Device uses `air`, `liquid`, `hybrid`, `immersion`. If you copy NDX `cooling_type` into it: `mixed` → `hybrid`; `passive` has no core equivalent (leave unset). NDX does not document writing this field on import.
+*(NetBox 4.7+)* Core `cooling_method` on DeviceType/ModuleType/Device uses `air`, `liquid`, `hybrid`, `immersion`. If you copy NDX `cooling_type` into it: `mixed` → `hybrid`; `passive` has no core equivalent (leave unset). NDX does not write this field on import (through plugin 0.8.3).
 
 ## Environmental (`has_environmental`)
 
@@ -46,6 +46,7 @@ Dates are **strings**, format `YYYY-MM` or `YYYY-MM-DD`.
 | `typical_power_draw_watts` | watts |
 | `max_power_draw_watts` | watts |
 | `noise_level_dba` | dBA |
+| `power_capacity_watts` | watts — what a PDU/power device can *distribute*; distinct from `max_power_draw_watts` (what the device itself draws) |
 
 ## Platform (`has_platform`)
 
@@ -78,7 +79,7 @@ A JSON object keyed by protocol name. Only a thin slice of this is promoted to t
 
 ## Provenance (the trust layer)
 
-Every non-null enrichment value carries a provenance entry, surfaced as `provenance_entries[]` on the enrichment. Per entry:
+Every non-null enrichment value carries a provenance entry, surfaced as `provenance_entries[]` on the enrichment (one entry per `field` per enrichment). Entries have no endpoint of their own; they are change-logged and *(plugin 0.8.0+)* render in `GET /api/core/object-changes/` with the same fields minus `url`. Per entry:
 
 | Field | Meaning |
 |-------|---------|

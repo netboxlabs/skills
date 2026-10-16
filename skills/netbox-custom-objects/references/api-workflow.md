@@ -309,7 +309,7 @@ Both endpoints accept `Content-Type: application/yaml` or `application/json` *(Y
 
 ## pynetbox
 
-pynetbox **7.8.0+** ships `CustomObjectsExtension`. Register it so JSON columns (`related_object_filter`, `schema_document`, `_context`) round-trip as dicts and per-type endpoints return typed records:
+pynetbox **7.8.0+** ships `CustomObjectsExtension`; on NetBox 4.7 use **7.9.0+** (2026-10-08; Python 3.12+) — the first release to declare 4.7 support, and it fixes updates to records carrying multi-selection custom fields (flattens `{value, label}`, sends only changed custom fields; 7.8.0 can fail those saves). Docs: <https://github.com/netbox-community/pynetbox/blob/master/docs/custom-objects.md>. Register the extension so JSON columns (`related_object_filter`, `schema_document`, `_context`) round-trip as dicts and per-type endpoints return typed records:
 
 ```python
 import pynetbox

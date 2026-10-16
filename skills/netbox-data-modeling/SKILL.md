@@ -223,7 +223,7 @@ See [references/custom-field-types.md](references/custom-field-types.md) for all
 - **Deep merge** for dicts; **replace** for lists
 - **Local context data** (on device/VM directly) always wins
 - **ConfigContextProfile** enforces JSON Schema validation
-- **Rendered output:** on 4.7+ `config_context` is pre-rendered, cached on the object, and **always** included in Device/VM REST responses (`?exclude=config_context` is silently ignored). On 4.5–4.6 exclude it with `?exclude=config_context` when listing devices/VMs — see [netbox-api-integration](../netbox-api-integration/SKILL.md)
+- **Rendered output:** on 4.7+ `config_context` is pre-rendered and cached on the object; `?exclude=config_context` is silently ignored on every 4.7.x. On 4.7.0–4.7.2 it is always loaded; on 4.7.3+ `?omit=config_context` (or `?fields=`/`?brief=True`) skips the DB annotation again. On 4.5–4.6 trim it with `?omit=config_context` (4.5.2+) or `?exclude=config_context` when listing devices/VMs — see [netbox-api-integration](../netbox-api-integration/SKILL.md)
 
 ## Dependency Order
 
@@ -260,7 +260,7 @@ See [references/dependency-order.md](references/dependency-order.md) for the com
 
 ## Version Notes
 
-### NetBox 4.7 (2026-09-02) — 4.7+ only; recommend ≥ 4.7.2
+### NetBox 4.7 (2026-09-02) — 4.7+ only; recommend ≥ 4.7.3 (4.7.0/4.7.1 leaked token plaintexts into job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation)
 
 | Change | Impact |
 |--------|--------|
@@ -274,7 +274,7 @@ See [references/dependency-order.md](references/dependency-order.md) for the com
 | **`end_of_life`** | Date on DeviceType/ModuleType |
 | **Interface `mac_address` writable** | Creates/updates the primary MACAddress; `MACAddress.is_primary` |
 | **Custom field selection values** | Returned as `{value, label}`; raw value on write. URL fields validated against `ALLOWED_URL_SCHEMES`; `nulls_first`; read-only `status` with background provisioning |
-| **Config context always returned** | Pre-rendered; `?exclude=config_context` ignored |
+| **Config context cached** | Pre-rendered; `?exclude=config_context` ignored on every 4.7.x; `?omit=config_context` skips the DB work again on 4.7.3+ |
 
 ### NetBox 4.5
 

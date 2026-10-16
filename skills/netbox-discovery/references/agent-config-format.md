@@ -1,6 +1,6 @@
 # Agent Config Format Reference
 
-Complete YAML schema for `agent.yaml` (orb-agent v2.15.0). All configuration lives under the top-level `orb:` key.
+Complete YAML schema for `agent.yaml` (orb-agent v2.16.0). All configuration lives under the top-level `orb:` key.
 
 ## Full Structure
 
@@ -49,7 +49,7 @@ orb:
         config: prd
         schedule: "*/5 * * * *"
       cyberark:                       # CCP (beta)
-        url: https://ccp.corp.example.com
+        url: https://ccp.corp.example.com   # base URL (agent appends /AIMWebService/api/Accounts), or the full …/api/Accounts endpoint when CCP runs under another IIS app name (v2.16)
         app_id: orb-agent
         client_cert: /opt/orb/secrets/orb.crt
         client_key: /opt/orb/secrets/orb.key
@@ -187,6 +187,7 @@ Most backends support a nested defaults hierarchy:
 defaults:
   site: main-dc
   role: switch
+  rack: R12             # device/snmp/gnmi: rack name in the site (+ location); quote numeric names ("01") (v2.16)
   description: "Discovered by Orb Agent"
   comments: ""
   tags:
@@ -202,7 +203,12 @@ defaults:
   # ip_address:         # snmp_discovery / gnmi_discovery spelling
   vlan:
     group: campus       # bare name (scoped to defaults.site) or {name, scope_site|scope_site_group|scope_region|scope_location}
+  vrf:                  # configured VRF map (same shape under ipaddress/ip_address/prefix, vrf_ipv4/vrf_ipv6)
+    name: mgmt
+    tenant: { name: "Acme", group: "Customers" }   # the VRF's own tenant — never inherited from the IP/prefix tenant (v2.16)
 ```
+
+A target's `override_defaults` may additionally set `position` (U from 1, steps of 0.5) and `face` (`front`|`rear`) — together, with a rack, on a single-address target only; they are refused in policy `defaults` *(v2.16)*. A tenant or VRF named differently in `override_defaults` replaces the policy's as a whole.
 
 ## Interface Patterns
 

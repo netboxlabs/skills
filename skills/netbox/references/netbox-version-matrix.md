@@ -2,7 +2,7 @@
 
 Quick reference for version-dependent features across the platform.
 
-> **Current line:** NetBox 4.7.x (this matrix covers **4.5–4.7**). 4.7 moved the platform to **Django 6.1** (4.6 was Django 6.0, 4.5 was Django 5.2), Python **3.12–3.14**, **PostgreSQL 15+ (required — the upgrade aborts on 14)** with the `ltree` extension, and **Redis 6.0+**. Run **≥4.7.2**: 4.7.0/4.7.1 recorded plaintext API tokens created via background bulk requests in job results, and 4.7.0 database dumps restore without the hierarchy cascade triggers. On the 4.6 line run **≥4.6.1** for the CVE-2026-29514 (template `environment_params` RCE) fix.
+> **Current line:** NetBox 4.7.x (this matrix covers **4.5–4.7**). 4.7 moved the platform to **Django 6.1** (4.6 was Django 6.0, 4.5 was Django 5.2), Python **3.12–3.14**, **PostgreSQL 15+ (required — the upgrade aborts on 14)** with the `ltree` extension, and **Redis 6.0+**. Run **≥4.7.3**: 4.7.0/4.7.1 recorded plaintext API tokens created via background bulk requests in job results, 4.7.0 database dumps restore without the hierarchy cascade triggers, and 4.7.0–4.7.2 dropped the `X-NetBox-Branch` header on background bulk writes (fixed 4.7.3, which also lets `?omit=config_context` skip config-context loading again). On the 4.6 line run **≥4.6.1** for the CVE-2026-29514 (template `environment_params` RCE) fix.
 
 ## NetBox Core
 
@@ -16,9 +16,9 @@ Quick reference for version-dependent features across the platform.
 | Cursor-based REST pagination | 4.6+ | `?start=<id>` — prefer over deep `?offset=`; pynetbox 7.8+ supports it natively |
 | `add_tags` / `remove_tags` write-only fields | 4.6+ | Avoid read-modify-write clobber of `tags` |
 | ETag / `If-Match` optimistic concurrency | 4.6+ | 412 on conflict → re-fetch and retry |
-| Config context pre-rendered & cached | 4.7+ | Always included in device/VM responses; `?exclude=config_context` is **silently ignored** on 4.7 (still required for performance on 4.5–4.6) |
+| Config context pre-rendered & cached | 4.7+ | Included by default in device/VM responses; `?exclude=` is a no-op on all 4.7.x (still required on 4.5–4.6). **4.7.3+**: `?omit=config_context` / `?fields=` / `?brief=True` skip loading it again — use `?omit=` as the portable form (4.5.2+) |
 | Selection custom field values as `{value, label}` | 4.7+ | REST and GraphQL responses; raw value still accepted on write |
-| Background bulk REST writes (`?background=true`) | 4.7+ | Returns 202 + job; validation deferred to the worker — poll the job. Never use it to create tokens |
+| Background bulk REST writes (`?background=true`) | 4.7+ | Returns 202 + job; validation deferred to the worker — poll the job. Never use it to create tokens. Request headers/query string (incl. `X-NetBox-Branch`) reach the worker only from **4.7.3** — on 4.7.0–4.7.2 the write lands in main |
 | Per-object bulk error responses | 4.7+ | `{"detail", "errors": [...]}` keyed by `index` on create and by `id` on update — still all-or-none |
 | Snapshot-aware event rule conditions | 4.7+ | `changed`/`unchanged`/`regex` operators; `snapshots.prechange.<attr>` paths |
 | Webhook context `username` / `request_id` | Removed 4.7 | Use `request.user` / `request.id` (available since 4.6) |
@@ -43,17 +43,17 @@ Quick reference for version-dependent features across the platform.
 
 | Product | Plugin / NetBox | Notes |
 |---------|---------------|-------|
-| NetBox Branching | v1.2.1 · NetBox **4.7** only; v1.1.3 · NetBox 4.4.1–4.6 | Two supported lines — pick by NetBox version. v1.2 replicates ltree/denormalization triggers into branch schemas; v1.1.2 added `auto_archive_days` |
+| NetBox Branching | v1.2.2 · NetBox **4.7** only; v1.1.3 · NetBox 4.4.1–4.6 | Two supported lines — pick by NetBox version. v1.2 replicates ltree/denormalization triggers into branch schemas; 1.2.2 returns 400 (not 500) for requests against a not-ready branch; v1.1.2 added `auto_archive_days` |
 | NetBox Changes | v1.1.3 · NetBox 4.5.2–4.7 | Pairs with Branching (1.1.x on ≤4.6, 1.2.x on 4.7); v1.1 adds a default policy (pre-selected in the UI) and per-policy independent review |
 | NetBox Custom Objects | v0.7.0 · NetBox 4.5.2–4.7 (0.6.1+ for 4.7) | No-code extensibility; v0.6 added branching + read-only GraphQL, v0.7 the related "Custom Objects" tab and YAML schema export |
-| NetBox Validation | v1.14.1 · NetBox 4.4–4.7 (4.7 from 1.14.0) | Policy-based compliance checks; run lifecycle hardened in 1.12 |
+| NetBox Validation | v1.14.3 · NetBox 4.4–4.7 (4.7 from 1.14.0) | Policy-based compliance checks; run lifecycle hardened in 1.12; 1.14.2 declares routing/security/baseline/overlay rule categories |
 | NetBox Asset Lifecycle | v0.3.1 · NetBox 4.5.4–4.7 | v0.3 renamed `bom-objects/` → `assets/` and reinitialized migrations (no upgrade from 0.2.x) |
-| NetBox Data Exchange (NDX) | Plugin v0.7.1 · NetBox 4.5–4.7 (Cloud / Enterprise) | In-product feature; 0.7.0+ writes core `end_of_life` from NDX `last_support_date` on 4.7+; type-definition catalog (YAML) is open and version-independent |
+| NetBox Data Exchange (NDX) | Plugin v0.8.3 · NetBox 4.5–4.7 (Cloud / Enterprise) | In-product feature; 0.7.0+ writes core `end_of_life` from NDX `last_support_date` on 4.7+; 0.8 imports DTL inventory items + port mappings; type-definition catalog (YAML) is open and version-independent |
 | NetBox Designs | Preview on NetBox Cloud · targets NetBox 4.6.0+ | YAML designs rendered, planned and applied through the target's REST API (v2 token); planning into a branch needs NetBox Branching |
 | Diode | NetBox 4.2.3+ | gRPC ingestion service |
-| Orb Agent (Discovery) | Agent v2.15.0 · NetBox 4.2+ | Via Diode; v2.15 ships SNMP and gNMI telemetry backends alongside discovery |
+| Orb Agent (Discovery) | Agent v2.16.0 · NetBox 4.2+ | Via Diode; v2.15 ships SNMP and gNMI telemetry backends alongside discovery; v2.16 adds per-target rack placement, VRF→tenant, LAG membership |
 | NetBox Assurance | Plugin v1.6.0 · NetBox 4.4.10–4.7 | Licensed add-on for NetBox Cloud and Enterprise; fed by Diode/Discovery |
-| netbox-mcp-server | v1.2.1 · NetBox 4.5+ | v2 tokens required; optional bearer auth on the HTTP transport |
+| netbox-mcp-server | v1.2.2 · NetBox 4.5+ | v2 tokens required; optional bearer auth on the HTTP transport |
 | Platform MCP Server | NetBox 4.5+ | Hosted on NetBox Cloud; v2 tokens (`nbt_`) required |
 | NetBox Cloud | Always latest | Managed by NetBox Labs |
 
@@ -61,7 +61,7 @@ Quick reference for version-dependent features across the platform.
 
 | SDK | Current | Language | NetBox Compatibility |
 |-----|---------|----------|---------------------|
-| pynetbox | 7.8.0 | Python | All versions; 7.7 adds 4.6 models, 7.8 adds cursor pagination + branching/custom-objects integrations |
-| diode-sdk-python | 1.14.1 | Python | 4.2.3+; ingester regenerated for 4.7 in 1.14.0 |
+| pynetbox | 7.9.0 | Python (3.12+) | All versions; 7.7 adds 4.6 models, 7.8 adds cursor pagination + branching/custom-objects integrations, **7.9 adds 4.7 support** (fixes multi-select custom field updates on 4.7) |
+| diode-sdk-python | 1.14.2 | Python | 4.2.3+; ingester regenerated for 4.7 in 1.14.0; 1.14.2 keeps TLS with `DIODE_SKIP_TLS_VERIFY` |
 | diode-sdk-go | 1.12.0 | Go | 4.2.3+ (import `.../diode-sdk-go/diode`); regenerated for 4.7 in 1.12.0 |
 | netbox-graphql-query-optimizer | 1.x | Python | 4.0+ |

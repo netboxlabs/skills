@@ -1,6 +1,6 @@
 # Diode Entity Type Catalog
 
-Complete list of entity types supported by the Diode SDK — **diode-sdk-python v1.14.1 / diode-sdk-go v1.12.0**, exposing **110 entity classes** and covering NetBox **4.5–4.7**. All types are available in both Python and Go SDKs. The generated entity set was last regenerated from NetBox v4.7.0 (python 1.14.0 / go 1.12.0).
+Complete list of entity types supported by the Diode SDK — **diode-sdk-python v1.14.2 / diode-sdk-go v1.12.0**, exposing **110 entity classes** and covering NetBox **4.5–4.7**. All types are available in both Python and Go SDKs. The generated entity set was last regenerated from NetBox v4.7.0 (python 1.14.0 / go 1.12.0).
 
 > **NetBox 4.7 models:** `CoolingSource`, `CoolingFeed`, `CoolingIntake`, `CoolingOutflow` and `ModuleBayType` are new in NetBox 4.7 — ingesting them (or the new 4.7 fields listed under [NetBox 4.7 Additions](#netbox-47-additions)) lands correctly only against a NetBox 4.7 instance with a matching Diode plugin.
 >

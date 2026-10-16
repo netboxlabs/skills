@@ -235,18 +235,18 @@ GET /api/plugins/branching/branchable-models/
 
 Returns all models that support branching, with `app_label`, `model`, `verbose_name`, and `verbose_name_plural` fields. Available on both supported lines (1.1.x and 1.2.x). See [branch-aware-models.md](branch-aware-models.md) for the practical heuristics.
 
-## Background Bulk Writes — Do Not Use in a Branch *(NetBox 4.7)*
+## Background Bulk Writes — Branch-Safe Only on NetBox 4.7.3+
 
 ```http
-POST /api/dcim/sites/?background=true      # WRONG inside a branch
+POST /api/dcim/sites/?background=true      # WRONG inside a branch on NetBox 4.7.0–4.7.2
 X-NetBox-Branch: a1b2c3d4
 ```
 
-NetBox 4.7's `?background=true` enqueues the bulk write as a job and rebuilds the request in the worker from a snapshot carrying only host/forwarding headers. `X-NetBox-Branch`, cookies, and `?_branch=` are not carried, so the job runs with **no active branch** and writes to **main** — the 202 gives no hint. Verified against NetBox 4.7.2 and branching 1.2.1. Use synchronous bulk requests in branch context; chunk large batches client-side.
+On NetBox 4.7.0–4.7.2, `?background=true` enqueues the bulk write as a job and rebuilds the request in the worker from a snapshot carrying only host/forwarding headers. `X-NetBox-Branch`, cookies, and `?_branch=` are not carried, so the job runs with **no active branch** and writes to **main** — the 202 gives no hint. Verified against NetBox 4.7.2 and branching 1.2.1. **NetBox 4.7.3+** carries the headers and query string (minus `background`; `Authorization` stripped) into the worker, so the job writes to the branch (netbox-community/netbox#23247). On ≤ 4.7.2 use synchronous bulk requests in branch context and chunk large batches client-side; on 4.7.3+ poll the job to a terminal status as for any background write.
 
 ## pynetbox
 
-pynetbox ≥ 7.8.0 ships a branching integration on its plugin-extension framework; `nb.activate_branch()` predates it and works on older 7.x too. Docs: <https://pynetbox.readthedocs.io/en/latest/branching/>.
+pynetbox ≥ 7.8.0 ships a branching integration on its plugin-extension framework; `nb.activate_branch()` predates it and works on older 7.x too. Current release **7.9.0** (2026-10-08) is the first to declare NetBox 4.7 support (Python 3.12+) and adds `changelog_message=` on create/`save()`/`update()`/`delete()`, bulk included — pass it inside a branch so the branch's change log carries the reason. Docs: <https://github.com/netbox-community/pynetbox/blob/master/docs/branching.md>.
 
 ```python
 import pynetbox

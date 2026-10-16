@@ -62,7 +62,7 @@ with DiodeClient(
     client.ingest(entities=entities)
 ```
 
-See [netbox-diode SKILL.md](../../netbox-diode/SKILL.md) for complete SDK patterns. Current SDKs: diode-sdk-python 1.14.1, diode-sdk-go 1.12.0 (both with token-fetch backoff on 429/5xx; Go also refreshes the token before expiry) — long-running custom sources should stay on these lines.
+See [netbox-diode SKILL.md](../../netbox-diode/SKILL.md) for complete SDK patterns. Current SDKs: diode-sdk-python 1.14.2, diode-sdk-go 1.12.0 (both with token-fetch backoff on 429/5xx; Go also refreshes the token before expiry) — long-running custom sources should stay on these lines.
 
 ## Supported Object Types
 

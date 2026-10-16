@@ -235,7 +235,7 @@ PLUGINS_CONFIG = {
 - **Bypass permission (v1.0+):** grant the **`bypass`** custom action on the **Policy** object (NetBox Change Management → Policy in the ObjectPermission form). Superusers get it implicitly. Describe it as "the bypass action on Policy" rather than a single flat permission string — internally the codename is `bypass` while the enforcement check still references `bypass_policy`.
 - During branch merge/revert, protect_main is temporarily suspended
 - Error when blocked: `"Changes directly to main are not permitted."`
-- *(NetBox 4.7)* `?background=true` bulk writes run in a worker with **no active branch** even when sent with `X-NetBox-Branch` (the header isn't carried to the job), so protect_main rejects them with the error above — inspect the job, the request itself returns 202. Use synchronous bulk writes in branch context.
+- *(NetBox 4.7.0–4.7.2)* `?background=true` bulk writes run in a worker with **no active branch** even when sent with `X-NetBox-Branch` (the header isn't carried to the job), so protect_main rejects them with the error above — inspect the job, the request itself returns 202. Use synchronous bulk writes in branch context there. *(NetBox 4.7.3+)* the header and query string are carried into the job, so background bulk writes land in the branch.
 
 See [references/protect-main.md](references/protect-main.md) for details.
 
@@ -292,10 +292,13 @@ GET /api/plugins/changes/policy-rules/?policy_id=1
 - **1.0.0:** multiple CRs per branch (one active), reopen rejected CRs, `bypass` permission, owner notifications, `retrigger/` action, `context.last_branch_change` in CR webhook payloads.
 - **1.0.2:** **minimum NetBox 4.5.2**; edit/delete of reviews, comments, replies restricted to their owner (also in bulk); `change_comment` needed to resolve/unresolve.
 
+### NetBox 4.7.3 (2026-10-13)
+- `?background=true` bulk writes carry `X-NetBox-Branch` / `?_branch=` into the worker, so protect_main no longer rejects branch-scoped background writes as writes to main. Run ≥ 4.7.3 (4.7.0/4.7.1 leaked token plaintexts into job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation).
+
 ### NetBox 4.7 (2026-09-02) — what changes for CR automation
 - Event-rule conditions gain `changed`/`unchanged` and `snapshots.prechange.*` paths: fire only when a CR *becomes* approved instead of on every save — see [references/api-patterns.md](references/api-patterns.md#event-rules-for-cr-automation).
 - Webhook context keys `username` and `request_id` are gone; use `request.user` / `request.id` in body templates.
-- Per-object bulk errors and `?background=true` (don't use it in a branch — see protect_main above).
+- Per-object bulk errors and `?background=true` (branch header dropped on 4.7.0–4.7.2 — don't use it in a branch there; carried on 4.7.3+ — see protect_main above).
 
 ## References
 

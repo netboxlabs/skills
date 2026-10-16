@@ -102,7 +102,7 @@ Apply writes through NetBox itself, so what you see in the Changes tab and anyth
 | Service / ServiceTemplate ports | `port_mappings` (`["tcp/53", "udp/53"]`) is the canonical field; `protocol` + `ports` are deprecated, populated only for single-protocol services (`null` otherwise), removed in 5.0. Don't send both in conflict. | `protocol` + `ports` only |
 | Interface MAC | `mac_address` is writable and creates/updates the primary MAC in one call; `MACAddress.is_primary` is read-only | `mac_address` read-only; assign via `primary_mac_address` |
 | Bulk create/update failures | `{"detail": ..., "errors": [{"index": N, "errors": {...}}]}` — per-object, still all-or-none | First failure only |
-| Device / VM reads | `config_context` always included; `?exclude=config_context` silently ignored | `?exclude=config_context` honoured |
+| Device / VM reads | `config_context` cached; `?exclude=config_context` silently ignored on every 4.7.x. 4.7.0–4.7.2 always load it; 4.7.3+ skip the DB work when `?omit=config_context`/`?fields=`/`?brief=True` leave it out | `?exclude=config_context` (or `?omit=`, 4.5.2+) honoured — skips the per-object render |
 
 If you follow up an Apply with your own `requests`/`pynetbox` calls, branch on the NetBox version when parsing custom-field values or service ports:
 

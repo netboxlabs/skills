@@ -93,13 +93,13 @@ The `netbox.netbox` Ansible collection (GPLv3) provides modules, dynamic invento
 
 ### Key Guidelines
 
-1. **Set `config_context: False` in inventory** unless you need it. On 4.5/4.6 this avoids an expensive per-device render server-side; on 4.7+ context is pre-rendered and always returned (`?exclude=config_context` is ignored), so the option only trims hostvars.
+1. **Set `config_context: False` in inventory** unless you need it. On 4.5/4.6 this avoids an expensive per-device render server-side; on 4.7+ context is pre-rendered and cached, and the plugin sends `?exclude=config_context` (ignored on every 4.7.x — 4.7.3's `?omit=` optimisation doesn't reach it, as of `netbox.netbox` 3.23.1), so the option only trims hostvars.
 
 2. **Use `query_filters`** to limit inventory scope server-side rather than filtering client-side.
 
 3. **Scope tokens properly** — Read-only tokens for inventory/lookup, write tokens only for modules that create/modify objects.
 
-4. **Version compatibility** — The collection's policy is the two most recent NetBox releases; the latest release (v3.23.0, 2026-05) is CI-tested through 4.5 and declares no 4.6/4.7 support yet. Pin the collection and test against your NetBox minor.
+4. **Version compatibility** — The collection's policy is the two most recent NetBox releases; the latest release (v3.23.1, 2026-10) is CI-tested through 4.5 and declares no 4.6/4.7 support yet. Pin the collection and test against your NetBox minor.
 
 5. **Filter with `device_query_filters`** — e.g., `has_primary_ip: 'true'` to exclude devices without management IPs.
 
@@ -178,7 +178,7 @@ These apply across all automation approaches:
 - **Webhook context**: `username` and `request_id` **removed** — use `request.user` / `request.id`. `send_webhook()` lost its `username` argument: **drain RQ queues before upgrading** or queued webhook jobs fail with `TypeError`.
 - **Webhook timeout**: per-webhook `timeout` field and `WEBHOOK_DEFAULT_TIMEOUT` (default 60); must be less than `RQ_DEFAULT_TIMEOUT`, else NetBox refuses to start / save.
 - **Event rules**: `action_object_type` optional; plugins register action types (`EventRuleAction`); `action_is_available` flags rules whose plugin is gone.
-- **Payload/API deltas that reach automation tools**: selection custom fields are `{value,label}` objects in REST (and thus webhook `data`); `config_context` always in device/VM output; `ipam.Service` `protocol`/`ports` deprecated for `port_mappings`; bulk write errors are per-object; `?background=true` on bulk writes.
+- **Payload/API deltas that reach automation tools**: selection custom fields are `{value,label}` objects in REST (and thus webhook `data`); `config_context` in device/VM output by default (omit it with `?omit=config_context` on 4.7.3+; `?exclude=` is a no-op on 4.7); `ipam.Service` `protocol`/`ports` deprecated for `port_mappings`; bulk write errors are per-object; `?background=true` on bulk writes.
 - **Ecosystem**: netbox-docker 5.x (`v4.7-5.1.1`) requires NetBox 4.7+; Ansible collection and Terraform provider have not declared 4.7 support (see references).
 
 ### NetBox 4.6 (2026-05-05)

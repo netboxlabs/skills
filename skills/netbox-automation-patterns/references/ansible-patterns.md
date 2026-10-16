@@ -4,7 +4,9 @@ Collection: `netbox.netbox` (GPLv3) — install via `ansible-galaxy collection i
 
 **Requirements:** Python 3.11+, pynetbox, pytz, Ansible 2.18+. Policy: supports the two most recent NetBox releases.
 
-> **Version status (checked 2026-09-30):** the latest collection release is **v3.23.0** (2026-05-12), whose CI matrix runs through NetBox **4.5**. No release yet declares 4.6 or 4.7 support. Modules mostly pass fields straight through the REST API, so most tasks work on 4.7, but test in staging before upgrading NetBox and watch the 4.7 deltas below.
+> **Version status (checked 2026-10-15):** the latest collection release is **v3.23.1** (2026-10-13), whose CI matrix runs through NetBox **4.5**. No release yet declares 4.6 or 4.7 support. Modules mostly pass fields straight through the REST API, so most tasks work on 4.7, but test in staging before upgrading NetBox and watch the 4.7 deltas below.
+>
+> **3.23.1 reverts 3.23.0's slug generation.** If 3.23.0 auto-generated slugs for objects whose names start or end with punctuation once stripped (`Site 1.` → `site-1`), 3.23.1 derives a different slug (`site-1-`), fails to find the existing object, and creates a duplicate — set `slug` explicitly on those tasks to match what is in NetBox. 3.23.1 also compares unordered many-to-many lists (`object_types`, `tagged_vlans`, route targets, config-context scopes, permissions/groups) as sets, so a reorder by NetBox no longer reports `changed`, and `netbox_device_interface`'s legacy `mac_address` is stored as the interface's `primary_mac_address` on NetBox 4.2+ (no more perpetual `changed`).
 
 ---
 
@@ -109,7 +111,7 @@ device_query_filters:
 
 ### Performance Tips
 
-1. **Set `config_context: false`** unless playbooks consume it — it keeps `config_context` out of hostvars. On **4.5/4.6** this also sends `?exclude=config_context`, sparing NetBox an expensive per-device render. On **4.7+** that parameter is silently ignored (context is pre-rendered/cached and always in the payload), so the server-side saving is gone; the option now only trims hostvars and response size.
+1. **Set `config_context: false`** unless playbooks consume it — it keeps `config_context` out of hostvars. On **4.5/4.6** this also sends `?exclude=config_context`, sparing NetBox an expensive per-device render. On **4.7+** that parameter is silently ignored on every 4.7.x (context is pre-rendered/cached and still in the payload), so the server-side saving is gone; the option now only trims hostvars. NetBox 4.7.3 restores a DB saving for `?omit=config_context`/`?fields=`, but the inventory plugin still sends `exclude` (as of `netbox.netbox` 3.23.1), so Ansible gains nothing from it until the plugin switches.
 
 2. **Use `query_filters`** — Filter server-side to avoid fetching thousands of devices you don't need.
 
@@ -163,7 +165,7 @@ Use `nb_lookup` for ad-hoc queries when the inventory plugin doesn't provide the
    ```yaml
    collections:
      - name: netbox.netbox
-       version: ">=3.23.0,<4.0.0"   # example — verify against the release that supports your NetBox 4.5–4.7
+       version: ">=3.23.1,<4.0.0"   # example — verify against the release that supports your NetBox 4.5–4.7
    ```
    The literal above is illustrative. Confirm the collection's NetBox support matrix (its CHANGELOG lists the CI matrix per release) for your target minor rather than copying a fixed pin.
 

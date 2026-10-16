@@ -142,7 +142,7 @@ For NetBox's data model and relationships, see [netbox-data-modeling](../netbox-
 - **Reference objects by name/slug in CSV**, not database IDs
 - **DeviceType/ModuleType use YAML format**, not CSV (they include component templates)
 - **Bulk create** with pynetbox: `nb.dcim.devices.create([{...}, {...}])` — batch in chunks of ~100 (a recommended size for throughput/memory, **not** a NetBox-enforced limit). Bulk writes are all-or-none. *(4.7)* A failed bulk write returns one error per offending object with its `index` in your submitted list — map it back to the source row and resubmit only those; very large batches can run as a background job with `?background=true`. See [references/import-patterns.md](references/import-patterns.md#bulk-write-errors-and-background-jobs-netbox-47).
-- **Trim `config_context`** on device/VM reads: on **4.5–4.6** send `?exclude=config_context` (massive performance impact); on **4.7+** config context is pre-rendered and the parameter is silently ignored — use `?fields=` / `?brief=True` instead
+- **Trim `config_context`** on device/VM reads with `?omit=config_context` (4.5.2+): on **4.5–4.6** it skips a massive per-object render; on **4.7.0–4.7.2** config context is cached and it only trims the payload; on **4.7.3+** it (like `?fields=`/`?brief=True`) skips the DB annotation again. `?exclude=config_context` is equivalent on 4.5–4.6 but silently ignored on every 4.7.x
 - **Reading back large sets for validation:** on NetBox **4.6+** prefer cursor pagination (`?start=<id>&limit=N`) over deep `?offset=` scans — offset slows linearly at high offsets. See [netbox-api-integration](../netbox-api-integration/SKILL.md).
 
 For API patterns, see [netbox-api-integration](../netbox-api-integration/SKILL.md).
@@ -256,7 +256,7 @@ A migration is **done** when:
 ### NetBox 4.7 (2026-09-02)
 
 - Failed bulk create/update returns `{"detail", "errors": [{"index": N, "errors": {...}}]}` (still all-or-none); `?background=true` on bulk writes returns 202 + a job to poll. See [references/import-patterns.md](references/import-patterns.md#bulk-write-errors-and-background-jobs-netbox-47).
-- `?exclude=config_context` is silently ignored (config context is cached and always present) — project with `?fields=` instead.
+- `?exclude=config_context` is silently ignored on every 4.7.x (config context is cached) — project with `?omit=config_context` or `?fields=` instead: payload-only on 4.7.0–4.7.2, skips the DB annotation again on 4.7.3+.
 - Selection custom fields read as `{"value", "label"}`; raw value still accepted on write.
 - Services: `port_mappings` (`["tcp/443"]`) replaces `protocol` + `ports` (legacy pair still writable, removed in 5.0).
 - New importable models: `ModuleBayType`, cooling sources/feeds/intakes/outflows, channel subinterfaces; `end_of_life` and `cooling_method` on DeviceType/ModuleType. See [references/dependency-order.md](references/dependency-order.md) and [references/source-mapping.md](references/source-mapping.md).

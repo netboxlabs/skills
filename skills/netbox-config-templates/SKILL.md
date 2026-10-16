@@ -16,8 +16,8 @@ license: Apache-2.0
 
 | Source | URL / Method | Use for |
 |--------|-------------|---------|
-| Config templates docs | `https://netboxlabs.com/docs/netbox/customization/config-templates/` | Template syntax, context variables |
-| Config contexts docs | `https://netboxlabs.com/docs/netbox/customization/config-contexts/` | Hierarchical data, merge rules |
+| Config templates docs | `https://netboxlabs.com/docs/netbox/features/configuration-rendering/` | Template syntax, context variables |
+| Config contexts docs | `https://netboxlabs.com/docs/netbox/features/context-data/` | Hierarchical data, merge rules |
 | NetBox repo | `https://github.com/netbox-community/netbox` | Template rendering source code |
 | NetBox MCP server | If configured — fetch device config contexts to test template rendering | Verify context data |
 
@@ -269,8 +269,8 @@ For detailed API examples including pynetbox and error handling, see [references
 ### Performance
 
 - **Config context on list endpoints:**
-  - **NetBox 4.7+**: merged config context is **pre-rendered and cached** on each device/VM and **always included** in the REST representation; `?exclude=config_context` is **silently ignored** (harmless if a shared client still sends it). List calls are cheap — the cost moved to a background re-render job.
-  - **NetBox 4.5/4.6**: computing merged config context per device is expensive — always send `GET /api/dcim/devices/?exclude=config_context` on bulk queries when you don't need it.
+  - **NetBox 4.7+**: merged config context is **pre-rendered and cached** on each device/VM; `?exclude=config_context` is **silently ignored** on every 4.7.x (harmless if a shared client still sends it). On 4.7.0–4.7.2 it is always loaded and list calls are cheap — the cost moved to a background re-render job. On **4.7.3+** `?omit=config_context` (or `?fields=`/`?brief=True`) skips the DB annotation and cached column again — send it when you don't need the context.
+  - **NetBox 4.5/4.6**: computing merged config context per device is expensive — always send `GET /api/dcim/devices/?omit=config_context` (4.5.2+; `?exclude=` is equivalent there) on bulk queries when you don't need it.
 - **ORM queries in templates** have no guardrails — avoid unbounded `.all()` on large tables.
 
 ### Template Behavior
@@ -290,11 +290,11 @@ For detailed API examples including pynetbox and error handling, see [references
 
 ### NetBox 4.7 (2026-09-02)
 
-- **Config context pre-rendered and cached** per device/VM, invalidated on upstream changes and re-rendered by a background job (on-demand fallback in between). `config_context` is **always** in device/VM REST output; `?exclude=config_context` is silently ignored. `DeviceWithConfigContextSerializer`/`VirtualMachineWithConfigContextSerializer` merged into the base serializers. Upgrade runs `rebuild_config_context_cache`.
+- **Config context pre-rendered and cached** per device/VM, invalidated on upstream changes and re-rendered by a background job (on-demand fallback in between). `?exclude=config_context` is silently ignored on every 4.7.x; `config_context` is always loaded on 4.7.0–4.7.2, while **4.7.3+** skips the DB annotation again when `?omit=config_context`/`?fields=`/`?brief=True` leaves it out. `DeviceWithConfigContextSerializer`/`VirtualMachineWithConfigContextSerializer` merged into the base serializers. Upgrade runs `rebuild_config_context_cache`.
 - **`JINJA2_FILTERS` renamed `JINJA_FILTERS`** (old name accepted with a deprecation warning until 5.0).
 - **Plugins can register Jinja filters and inject context variables** (`jinja_env.py`, `register_jinja_filters()`, `get_jinja_context()`); precedence built-in → plugin → instance `JINJA_FILTERS`. netbox-custom-objects v0.6.1+ uses this to expose `custom_objects.<type>` / `'<type>' | custom_objects`.
 - New data reachable from templates: `device.cooling_method`, interface `channels`/`channel_id` (channelized subinterfaces of type `channel`), service `port_mappings` (list of `"tcp/80"` strings; `protocol`/`ports` deprecated), `device_type.end_of_life`. Selection custom fields still read as raw values via `device.cf` / `custom_field_data` in templates — only the REST/GraphQL representation became `{value, label}`.
-- Platform: PostgreSQL 15+, Redis 6.0+, `ltree` extension; recommend **4.7.2+**.
+- Platform: PostgreSQL 15+, Redis 6.0+, `ltree` extension; recommend **4.7.3+** (4.7.0/4.7.1 leaked token plaintexts into job results; 4.7.3 adds branch-safe background writes and the config-context omit optimisation).
 
 ### NetBox 4.6 (2026-05-05)
 
