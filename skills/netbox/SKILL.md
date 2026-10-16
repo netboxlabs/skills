@@ -18,6 +18,7 @@ This is the entry point for all NetBox-related tasks. Use the decision trees bel
 **Model your network?**
 - Define sites, devices, circuits, IPAM → [netbox-data-modeling](../netbox-data-modeling/SKILL.md)
 - Create new object types without code → [netbox-custom-objects](../netbox-custom-objects/SKILL.md)
+- Build racks, sites and cabling from reusable YAML designs (render → plan → review → apply) → [netbox-designs](../netbox-designs/SKILL.md)
 
 **Build an integration?**
 - Query or write data via REST/GraphQL → [netbox-api-integration](../netbox-api-integration/SKILL.md)
@@ -77,6 +78,7 @@ This is the entry point for all NetBox-related tasks. Use the decision trees bel
 | [netbox-assurance](../netbox-assurance/SKILL.md) | Platform | Drift detection — intended vs actual, remediation |
 | [netbox-asset-lifecycle](../netbox-asset-lifecycle/SKILL.md) | Platform | Procurement lifecycle — BOMs, POs, shipments, receiving, spares |
 | [netbox-ndx](../netbox-ndx/SKILL.md) | Platform | Data Exchange — device-type catalog + enrichment (lifecycle, thermal, protocols) |
+| [netbox-designs](../netbox-designs/SKILL.md) | Platform | Infrastructure as code — YAML designs, composition, plan/apply, deployments |
 | [netboxlabs-platform-mcp](../netboxlabs-platform-mcp/SKILL.md) | Platform | Platform MCP server — code mode & discrete mode for agents |
 | [netbox-automation-patterns](../netbox-automation-patterns/SKILL.md) | Cross-cutting | Webhooks, Ansible, Terraform, GitOps |
 | [netbox-migration](../netbox-migration/SKILL.md) | Cross-cutting | Migrating from spreadsheets, CMDBs, other tools |
@@ -112,6 +114,8 @@ Some tasks span multiple skills. Common combinations:
 | Procure planned equipment | `netbox-data-modeling` + `netbox-asset-lifecycle` |
 | EOL exposure across inventory | `netbox-ndx` + `netbox-api-integration` |
 | Agent-driven NetBox automation | `netboxlabs-platform-mcp` + `netbox-api-integration` |
+| Build a rack from a design, safely | `netbox-designs` + `netbox-branching` |
+| Greenfield site as code | `netbox-data-modeling` + `netbox-designs` + `netbox-ndx` |
 
 ---
 

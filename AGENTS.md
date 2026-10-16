@@ -28,6 +28,7 @@ For non-Claude agents: load the hub skill first, then drill into specialists.
 | netbox-assurance | `skills/netbox-assurance/SKILL.md` | Drift detection and remediation |
 | netbox-asset-lifecycle | `skills/netbox-asset-lifecycle/SKILL.md` | Procurement (BOMs, POs, shipments) and spares |
 | netbox-ndx | `skills/netbox-ndx/SKILL.md` | Consuming device-type catalog + enrichment data |
+| netbox-designs | `skills/netbox-designs/SKILL.md` | Writing and reviewing NetBox Designs (YAML infrastructure as code) |
 | netboxlabs-platform-mcp | `skills/netboxlabs-platform-mcp/SKILL.md` | Driving the Platform MCP server (code/discrete mode) |
 | netbox-automation-patterns | `skills/netbox-automation-patterns/SKILL.md` | Webhooks, Ansible, Terraform, GitOps |
 | netbox-migration | `skills/netbox-migration/SKILL.md` | Data migration into NetBox |

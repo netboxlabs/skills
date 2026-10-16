@@ -60,6 +60,7 @@ npx skills add netboxlabs/skills
 | [netbox-assurance](skills/netbox-assurance/) | Drift detection — intended vs actual, remediation |
 | [netbox-asset-lifecycle](skills/netbox-asset-lifecycle/) | Procurement lifecycle — BOMs, POs, shipments, receiving, spares |
 | [netbox-ndx](skills/netbox-ndx/) | Data Exchange — device-type catalog + enrichment (lifecycle, thermal, protocols) |
+| [netbox-designs](skills/netbox-designs/) | Infrastructure as code — write and review YAML designs that plan and apply to NetBox |
 | [netboxlabs-platform-mcp](skills/netboxlabs-platform-mcp/) | Platform MCP server — code mode & discrete mode for agents |
 | [netbox-automation-patterns](skills/netbox-automation-patterns/) | Webhooks, Ansible, Terraform, GitOps |
 | [netbox-migration](skills/netbox-migration/) | Migrating from spreadsheets, CMDBs, other tools |

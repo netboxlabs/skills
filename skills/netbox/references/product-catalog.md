@@ -16,6 +16,7 @@ Reference for all platform products and their interfaces.
 | **NetBox Assurance** | Drift Detection | NetBox UI (deviation review); fed by Diode/Discovery | `netbox-assurance` |
 | **NetBox Asset Lifecycle** | Procurement / Asset Management | REST API (`/api/plugins/asset-lifecycle/`) + UI | `netbox-asset-lifecycle` |
 | **NetBox Data Exchange (NDX)** | Reference Data Catalog | Open catalog (YAML) + REST API (`/api/plugins/ndx/`) | `netbox-ndx` |
+| **NetBox Designs** | Infrastructure as Code | YAML designs; Designs UI on NetBox Cloud + `nbd` CLI; plans applied via the target NetBox's REST API | `netbox-designs` |
 | **netbox-mcp-server** | Agent Interface | MCP protocol (SSE/stdio) | [GitHub](https://github.com/netboxlabs/netbox-mcp-server) |
 | **NetBox Labs Platform MCP Server** | Agent Interface | MCP protocol (streamable HTTP) | `netboxlabs-platform-mcp` |
 | **NetBox Cloud** | Managed Deployment | Console UI, REST API | *(no skill yet)* |

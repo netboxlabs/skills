@@ -49,6 +49,7 @@ Quick reference for version-dependent features across the platform.
 | NetBox Validation | v1.14.1 · NetBox 4.4–4.7 (4.7 from 1.14.0) | Policy-based compliance checks; run lifecycle hardened in 1.12 |
 | NetBox Asset Lifecycle | v0.3.1 · NetBox 4.5.4–4.7 | v0.3 renamed `bom-objects/` → `assets/` and reinitialized migrations (no upgrade from 0.2.x) |
 | NetBox Data Exchange (NDX) | Plugin v0.7.1 · NetBox 4.5–4.7 (Cloud / Enterprise) | In-product feature; 0.7.0+ writes core `end_of_life` from NDX `last_support_date` on 4.7+; type-definition catalog (YAML) is open and version-independent |
+| NetBox Designs | Preview on NetBox Cloud · targets NetBox 4.6.0+ | YAML designs rendered, planned and applied through the target's REST API (v2 token); planning into a branch needs NetBox Branching |
 | Diode | NetBox 4.2.3+ | gRPC ingestion service |
 | Orb Agent (Discovery) | Agent v2.15.0 · NetBox 4.2+ | Via Diode; v2.15 ships SNMP and gNMI telemetry backends alongside discovery |
 | NetBox Assurance | Plugin v1.6.0 · NetBox 4.4.10–4.7 | Licensed add-on for NetBox Cloud and Enterprise; fed by Diode/Discovery |
