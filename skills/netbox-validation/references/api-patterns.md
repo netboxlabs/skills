@@ -229,6 +229,19 @@ curl "$NETBOX_URL/api/plugins/validation/compliance/?device_id=10&ordering=-meas
   -H "Authorization: Bearer $NETBOX_TOKEN"
 curl "$NETBOX_URL/api/plugins/validation/compliance/?policy_id=1" \
   -H "Authorization: Bearer $NETBOX_TOKEN"
+
+# Fleet analytics (current state: latest completed run per active policy; inline evaluations never count)
+curl "$NETBOX_URL/api/plugins/validation/compliance/summary/?target=80" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/compliance/trend/?days=30" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/compliance/breakdown/?group_by=platform" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
+# Configuration compliance: coverage, hardening/framework posture, source-of-truth drift
+curl "$NETBOX_URL/api/plugins/validation/compliance/config-coverage/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
+curl "$NETBOX_URL/api/plugins/validation/compliance/posture/" \
+  -H "Authorization: Bearer $NETBOX_TOKEN"
 ```
 
 ## Policy Packs
