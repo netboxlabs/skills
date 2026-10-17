@@ -446,9 +446,11 @@ Validation provides the automated safety net ensuring agents operate within the 
 | `/findings/summary/` | GET | Finding counts by status, severity, category (respects filters) |
 | `/findings/bulk-update-status/` | POST | `{"ids": [...], "status": "..."}` — bulk status change |
 | `/compliance/` | GET | Compliance scores (filter by device, policy) |
-| `/compliance/summary/` | GET | Fleet score, device count, finding counts |
-| `/compliance/trend/?days=N` | GET | Daily compliance scores over time |
-| `/compliance/breakdown/?group_by=site\|role\|policy` | GET | Scores grouped by dimension (deleted policies keep their history under the snapshotted name) |
+| `/compliance/summary/` | GET | Fleet composite over active policies, open findings from each policy's current run, `policies_below_target` (`?target=80`) |
+| `/compliance/trend/?days=N` | GET | Fleet composite per day (each device's latest score per policy carried forward) |
+| `/compliance/breakdown/?group_by=site\|role\|platform\|policy` | GET | Scores grouped by dimension (deleted policies keep their history under the snapshotted name) |
+| `/compliance/config-coverage/` | GET | Devices with an intended configuration, missing devices and reasons, families, sources |
+| `/compliance/posture/` | GET | Pass rate by hardening plane and by framework (CIS, STIG, NSA, PCI DSS, NIST 800-53) plus source-of-truth drift |
 | `/compliance/distribution/` | GET | Histogram of device compliance scores |
 | `/compliance/worst-performers/?limit=N` | GET | Lowest-scoring devices |
 | `/checks/` | GET | Catalog of every built-in check (filter by `engine`, `layer`, `group`, `category`, `family`) |
