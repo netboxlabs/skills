@@ -1,6 +1,8 @@
-# Check Reference — All 95 Built-in Checks
+# Check Reference — All 218 Built-in Checks
 
-Checks evaluate NetBox data server-side; parameters below are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` present by default (omit it with `?omit=config_context` on 4.7.3+)) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
+44 intent, 158 config (9 text primitives, 84 hardening controls, 24 source-of-truth parity, 41 model-layer), 16 graph. Parameters below are a summary; the authoritative schema, defaults, supported families and framework references for any check come from `GET /api/plugins/validation/checks/{name}/` — read it before writing a rule.
+
+Checks evaluate NetBox data or intended configuration server-side; parameters are unchanged on NetBox 4.7. The 4.7 REST changes (`{value, label}` selection custom fields, `port_mappings` on services, `config_context` always present) only affect how an agent reads or fixes the objects behind a finding — see [netbox-api-integration](../../netbox-api-integration/SKILL.md).
 
 ## Intent Checks (44)
 
@@ -78,47 +80,112 @@ Checks evaluate NetBox data server-side; parameters below are unchanged on NetBo
 | `secure_protocols_enforced` | No cleartext mgmt protocols (Telnet/HTTP/SNMPv1-2c/FTP) in config context | `insecure_keys`, `required_keys` |
 | `ephi_zone_segmentation` | Sensitive-zone prefixes isolated in a dedicated VRF | `zones` |
 
-## Config Checks (35)
+## Config Checks (158)
 
-*Premium tier. Requires `enable_config_engine: true` on the policy and NetBox Config Templates assigned to the devices (via device, platform, or role); devices without a rendered configuration produce `skip` results.*
+*Premium tier. Requires `enable_config_engine: true` and a config source on the policy. Every result records `extra.layer` (`text` or `model`), `extra.family` and `extra.source`. See [config-compliance.md](config-compliance.md) for rule-writing guidance, result semantics and the skip reasons.*
 
-| Check | Category | Description | Parameters |
-|-------|----------|-------------|------------|
-| `config_parse_status` | Parse | Configs parse without errors | -- |
-| `config_parse_warnings` | Parse | Config parse warnings | `max_warnings: 0` |
-| `undefined_references` | Parse | Undefined ACLs/route-maps | -- |
-| `unused_structures` | Parse | Defined but unused structures | -- |
-| `bgp_sessions` | Routing | BGP session compatibility | -- |
-| `bgp_unestablished_reason` | Routing | Why BGP can't establish | -- |
-| `bgp_process_config` | Routing | BGP process correctness | -- |
-| `bgp_rib_validation` | Routing | Expected BGP RIB routes | `expected_routes` |
-| `ospf_session_compatibility` | Routing | OSPF neighbor compatibility | -- |
-| `ospf_process_config` | Routing | OSPF process/area config | -- |
-| `routing_loop_detection` | Routing | Forwarding loops | -- |
-| `multipath_consistency` | Routing | ECMP consistency | -- |
-| `bgp_localpref_equals` | Routing | Local-pref matches expected value | `prefix`, `expected_localpref` |
-| `bgp_med_equals` | Routing | MED matches expected value | `prefix`, `expected_med` |
-| `route_advertised_to` | Routing | Prefix advertised to neighbors | `prefix`, `expected_neighbors` |
-| `duplicate_ips` | IP | Duplicate IPs in config | -- |
-| `ip_owners_conflict` | IP | IP ownership conflicts | -- |
-| `layer3_topology_complete` | IP | L3 adjacency validation | -- |
-| `interface_mtu_config` | IP | MTU mismatches in config | -- |
-| `hsrp_vrrp_config` | IP | FHRP configuration | -- |
-| `acl_reachability` | Security | Unreachable/shadowed ACL lines | -- |
-| `acl_denies_traffic` | Security | ACL denies specified flows | `flow` |
-| `bgp_prefix_filter_applied` | Security | eBGP peers have filters | -- |
-| `bgp_authentication_configured` | Security | BGP MD5/TCP-AO auth | -- |
-| `ospf_authentication_configured` | Security | OSPF message-digest auth | `require_type` |
-| `management_access_acl_configured` | Security | VTY access-class ACLs | -- |
-| `assert_traffic_blocked` | Security | Traffic flows blocked | `src_ip`, `dst_ip`, `applications` |
-| `vxlan_vni_config` | Overlay | VXLAN VNI mapping | -- |
-| `evpn_l3_vni_consistency` | Overlay | EVPN L3 VNI consistency | -- |
-| `snmp_community_clients` | Overlay | SNMP community audit | -- |
-| `reachability_assertion` | Reachability | Src-to-dst reachability | `src_ip`, `dst_ip`, `applications` |
-| `traceroute_reachability` | Reachability | Traceroute path validation | `src_ip`, `dst_ip` |
-| `route_table_completeness` | Reachability | Expected routes present | `expected_routes` |
-| `differential_reachability` | Differential | Lost/new reachability (branch) | -- |
-| `routing_changes` | Differential | Route changes (branch) | -- |
+### Text Primitives (9) — text layer, all families
+
+| Check | Description | Parameters (defaults) |
+|-------|-------------|------------|
+| `config_contains` | Required lines/patterns present | `lines: []`, `regex: []`, `section`, `section_depth: top` (`top\|any`), `match: all`, `match_mode: exact`, `ignore_case: false` |
+| `config_not_contains` | Forbidden lines/patterns absent | `lines: []`, `regex: []`, `section`, `section_depth: top`, `match_mode: exact`, `ignore_case: false` |
+| `config_section_present` | Top-level section exists | `section`, `match: all` |
+| `config_section_absent` | Top-level section does not exist | `section` |
+| `config_each_block` | Every block matching `block` satisfies require/forbid; passes with "No matching blocks to evaluate" when none match unless `min_blocks` is set | `block`, `depth: 0`, `exclude`, `when`, `require: []`, `require_lines: []`, `forbid: []`, `forbid_lines: []`, `allow_empty: false`, `min_blocks: 0` |
+| `config_value` | Capture a value and compare (block bodies are indentation-stripped: `^exec-timeout`, not `^ exec-timeout`) | `pattern`, `op: eq` (`eq\|ne\|lt\|le\|gt\|ge\|in\|not_in\|subset_of\|superset_of\|count_ge\|count_le\|regex`), `value`, `value_from: literal` (`config_context:<path>`, `netbox:<key>`), `section`, `section_depth: top`, `group: 1`, `require_match: true`, `all: true` |
+| `config_section_allowlist` | Everything in a section matches an allowlist | `section`, `allow: []`, `allow_lines: []`, `include_head: false` |
+| `config_banner_contains` | Banner exists and contains phrases | `banner: any`, `phrases: []`, `ignore_case: true`, `min_length: 0` |
+| `config_unparsed_lines` | Coverage: significant lines no rule evaluated | `max_lines: 0`, `max_percent`, `ignore: []` |
+
+### Hardening Controls (84) — text layer, per-family pattern tables
+
+Vendor-neutral control names; the device's family selects the syntax. Most take no parameters. Each carries a top-level `plane` (`management` | `control` | `data`), `framework_refs` (`cis_ios_xe`, `cis_nxos`, `cis_junos`, `stig`, `nsa_2022`, `pci_dss_4`, `nist_800_53`) and `families` populated from the pattern tables (e.g. `vtp_transparent_or_off` → `["ios", "nxos"]`). Pattern tables are per family and still expanding; on a family absent from `families` the control returns `skip` with `extra.reason` "not applicable" (message explains why) or "no pattern for family" — never `fail`. Pre-flight against `GET /checks/{name}/`. Full metadata: `GET /checks/?group=Hardening`.
+
+**Management plane (39)** — `aaa_enabled`, `aaa_login_authentication_configured`, `aaa_accounting_enabled`, `local_fallback_user_exists`, `local_accounts_least_privilege`, `enable_secret_configured`, `password_encryption_enabled`, `local_users_use_secret`, `password_policy_min_length` (`min_length: 15`), `login_lockout_configured` (`max_attempts: 5`, `min_block_seconds: 60`), `ssh_version_2`, `ssh_timeout_and_retries` (`max_timeout: 60`, `max_retries: 3`), `ssh_key_strength` (`min_modulus: 2048`), `telnet_disabled`, `http_server_disabled`, `https_only_management`, `vty_access_class_configured`, `vty_exec_timeout` (`max_minutes: 10`), `console_exec_timeout` (`max_minutes: 10`), `aux_port_disabled`, `login_banner_configured` (`phrases: []`), `motd_banner_configured` (`phrases: []`), `snmp_no_default_communities`, `snmp_v3_priv_required`, `snmp_community_acl_configured`, `snmp_read_only`, `snmp_trap_hosts_configured` (`min_hosts: 1`), `logging_hosts_min_count` (`min_hosts: 2`), `logging_buffered_configured`, `logging_timestamps_enabled`, `logging_source_interface_configured`, `logging_level_minimum` (`level: informational`), `ntp_servers_min_count` (`min_servers: 2`), `ntp_authentication_enabled`, `ntp_source_interface_configured`, `single_management_loopback`, `management_not_on_vlan1`, `config_archive_enabled`, `fips_algorithms_only`
+
+**Control plane (18)** — `cdp_disabled_on_edge` (`edge`, `edge_when`), `lldp_disabled_on_edge` (`edge`, `edge_when`), `bootp_server_disabled`, `dhcp_service_disabled`, `pad_service_disabled`, `tcp_keepalives_enabled`, `ip_source_route_disabled`, `copp_configured`, `ospf_authentication_configured`, `bgp_authentication_configured`, `eigrp_authentication_configured`, `isis_authentication_configured`, `bgp_ttl_security_configured`, `bgp_max_prefix_configured`, `bgp_prefix_filter_applied`, `bogon_prefix_filter_present`, `ospf_passive_default_on_edge`, `routing_key_lifetime_max_days` (`max_days: 180`, `require_lifetimes: true`)
+
+**Data plane (27)** — `proxy_arp_disabled`, `directed_broadcast_disabled`, `icmp_redirects_disabled`, `icmp_unreachables_disabled_external` (`external`, `external_when`), `urpf_enabled_on_edge` (`edge`, `edge_when`), `antispoof_acl_on_external` (`external`, `external_when`), `acl_denies_private_from_external`, `acl_explicit_deny_log` (`exclude`), `acl_no_permit_any_any`, `no_tunnel_interfaces`, `unused_ports_shutdown` (`unused_when`), `unused_ports_in_parking_vlan` (`vlan: 999`), `no_vlan1_on_access_ports` (`access_when`), `native_vlan_not_1`, `vlan1_pruned_from_trunks`, `trunks_explicit_allowed_vlans`, `bpduguard_on_access_ports` (`access_when`), `rootguard_on_designated_ports`, `loopguard_or_udld_enabled`, `dhcp_snooping_enabled`, `dynamic_arp_inspection_enabled`, `ip_source_guard_enabled` (`access_when`), `port_security_on_access_ports` (`access_when`), `storm_control_on_access_ports` (`access_when`), `dot1x_on_access_ports` (`access_when`), `vtp_transparent_or_off`, `igmp_snooping_enabled`
+
+### Source-of-Truth Parity (24) — `expected` = NetBox, `actual` = configuration
+
+| Check | Layer | Description | Parameters |
+|-------|-------|-------------|------------|
+| `hostname_matches_netbox` | text | Hostname equals the device name | `ignore_case: true`, `strip_domain: true` |
+| `interface_descriptions_match_netbox` | model | Interface descriptions match NetBox | `template`, `ignore_unmanaged: true` |
+| `interface_ips_match_ipam` | model | Interface IPs match IPAM assignments | -- |
+| `interface_admin_state_matches_netbox` | model | Enabled in NetBox ⇔ not `shutdown` | -- |
+| `interface_mtu_matches_netbox` | model | MTU equals NetBox MTU where set | -- |
+| `interface_vrf_matches_netbox` | model | Interface VRF membership matches | -- |
+| `interface_switchport_matches_netbox` | model | Access/trunk mode and VLANs match | -- |
+| `lag_membership_matches_netbox` | model | Channel-group membership matches LAG parents | -- |
+| `netbox_interfaces_present_in_config` | model | Every NetBox interface (excluding virtual/LAG/other and mgmt-only by default) exists in the configuration | `ignore_types: [virtual, lag, other]`, `ignore_mgmt_only: true` |
+| `config_interfaces_present_in_netbox` | model | Every configured interface is documented in NetBox | `ignore_regex` |
+| `cabled_interfaces_enabled` | model | Interfaces with a cable in NetBox are not shut down | -- |
+| `uncabled_interfaces_shutdown` | model | Physical interfaces without a cable are administratively down | -- |
+| `vrfs_match_netbox` | model | Device VRFs match NetBox | -- |
+| `vlans_match_netbox` | model | Device VLANs vs site/group VLANs | `mode: subset` (no undocumented VLANs on the device) — also `superset` (every NetBox VLAN configured), `equal` |
+| `bgp_neighbors_match_netbox` | model | BGP peers match netbox-bgp sessions | -- |
+| `bgp_local_as_matches_netbox` | model | Local AS equals assigned ASN | -- |
+| `router_id_is_loopback` | model | BGP/OSPF router-ids equal a loopback address documented in NetBox | -- |
+| `fhrp_matches_netbox` | model | HSRP/VRRP groups and priorities per interface match NetBox FHRP group assignments | -- |
+| `ospf_passive_interfaces_match_role` | model | Uncabled OSPF interfaces are passive, cabled links active | -- |
+| `ntp_servers_match_context` | model (text on fortios/panos/asa/aoscx) | NTP servers equal config context list | `path: ntp.servers`, `mode: equal` |
+| `dns_servers_match_context` | model (text on fortios/panos/asa/aoscx) | DNS servers equal config context list | `path: dns.servers`, `mode: equal` |
+| `syslog_hosts_match_context` | model (text on fortios/panos/asa/aoscx) | Logging hosts equal config context list | `path: syslog.hosts`, `mode: equal` |
+| `aaa_servers_match_context` | text | TACACS/RADIUS servers equal config context | `tacacs_path: aaa.tacacs_servers`, `radius_path: aaa.radius_servers`, `mode: equal` |
+| `snmp_matches_context` | text | SNMP communities/trap hosts/location/contact match | `path: snmp`, `mode: equal` |
+
+Model-layer checks run for `ios`, `nxos`, `iosxr`, `eos`, `junos`, `panos`, `fortios`, `asa` (skip on `aoscx`); the three `ntp`/`dns`/`syslog` context checks fall back to the text layer on `fortios`, `panos`, `asa` and `aoscx`, and the `aaa`/`snmp` context checks are text-layer everywhere (so they do run on `aoscx`). `mode` accepts `equal`, `subset`, `superset`.
+
+### Model Layer (41) — analysis service
+
+| Check | Group | Scope | Description | Parameters |
+|-------|-------|-------|-------------|------------|
+| `config_parse_status` | Config Quality | device | Every configuration parsed completely | -- |
+| `config_parse_warnings` | Config Quality | device | Unrecognised lines (advisory → `warning`) | `max_warnings: 0` |
+| `config_init_issues` | Config Quality | device | Issues raised while building the network model | -- |
+| `undefined_references` | Config Quality | device | References to undefined ACLs/route-maps/prefix-lists | -- |
+| `unused_structures` | Config Quality | device | Defined but never referenced (advisory) | -- |
+| `bgp_sessions` | Routing | device | BGP sessions compatible on both ends | -- |
+| `bgp_unestablished_reason` | Routing | device | Why specific BGP sessions cannot establish | -- |
+| `bgp_process_config` | Routing | device | Router-ID and multipath settings | `expected_router_ids`, `multipath_ebgp` |
+| `bgp_rib_validation` | Routing | device | Expected prefixes in the BGP RIB | `expected_prefixes: []` |
+| `bgp_localpref_equals` | Routing | device | Local-pref for a prefix equals expected | `prefix`, `expected_localpref` |
+| `bgp_med_equals` | Routing | device | MED for a prefix equals expected | `prefix`, `expected_med` |
+| `route_advertised_to` | Routing | device | Prefix in RIB and sessions to each expected neighbor | `prefix`, `expected_neighbors: []` |
+| `route_table_completeness` | Routing | device | Expected routes present in the main RIB | `expected_routes: []`, `node` |
+| `ospf_session_compatibility` | Routing | device | OSPF adjacencies compatible | -- |
+| `ospf_process_config` | Routing | device | Expected OSPF areas configured | `expected_areas: []` |
+| `no_duplicate_router_ids` | Routing | fleet | No two devices share a router-id | -- |
+| `route_policy_behaves` | Routing | fleet | Route policies permit/deny test routes as expected, with optional attribute checks | `cases: []` |
+| `vrf_route_leaking_as_designed` | Routing | fleet | Leaked prefixes present where designed and absent elsewhere | `leaks: []`, `forbid_other_vrfs: false` |
+| `duplicate_ips` | Addressing | fleet | Same IP owned by more than one interface | -- |
+| `ip_owners_conflict` | Addressing | fleet | Parser-native duplicate IP detection | -- |
+| `interface_mtu_config` | Topology | device | MTU matches on both ends of every L3 link | -- |
+| `layer3_topology_complete` | Topology | fleet | At least one L3 adjacency modelled | -- |
+| `hsrp_vrrp_config` | Redundancy | device | FHRP groups have an active router | -- |
+| `mlag_consistency` | Redundancy | fleet | Every MLAG domain has exactly two members | -- |
+| `vxlan_vni_config` | Overlay | device | VNIs have flood lists and local VTEP IPs | -- |
+| `evpn_l3_vni_consistency` | Overlay | fleet | Each VRF maps to exactly one L3 VNI | -- |
+| `routing_loop_detection` | Reachability | fleet | No forwarding loops | -- |
+| `multipath_consistency` | Reachability | fleet | ECMP paths behave consistently | -- |
+| `traceroute_reachability` | Reachability | fleet | Simulated traceroute src→dst accepted | `src_ip`, `dst_ip` |
+| `reachability_assertion` | Reachability | fleet | Flows from source location reach destination with disposition | `dst_ip`, `src_location: "/.*/"`, `action: SUCCESS` |
+| `assert_traffic_blocked` | Reachability | fleet | Traffic src→dst denied or unrouted (segmentation) | `src_ip`, `dst_ip`, `protocol`, `dst_port` |
+| `acl_reachability` | Filters | device | No shadowed/unreachable filter lines | -- |
+| `acl_denies_traffic` | Filters | device | A filter denies the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port` |
+| `acl_unused` | Filters | device | ACLs, prefix lists, route maps and policies defined but never referenced (advisory) | `types_regex`, `ignore_regex` |
+| `filter_permits` | Filters | fleet | The selected filters permit the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port`, `filters`, `nodes` |
+| `filter_denies` | Filters | fleet | The selected filters deny the described flow | `src_ip`, `dst_ip`, `protocol`, `dst_port`, `filters`, `nodes` |
+| `named_structure_matches` | Filters | device | A named structure exists and contains expected fragments or equals an expected JSON definition | `structure_name`, `structure_type`, `nodes`, `expected_contains: []`, `expected_json` |
+| `snmp_community_clients` | Management | device | Clients permitted per SNMP community | `communities: []` |
+| `management_access_acl_configured` | Management | device | Legacy heuristic — prefer `vty_access_class_configured` | `management_subnets: []` |
+| `differential_reachability` | Pre-change | fleet | Flows that succeed today still succeed with proposed configs (branch only) | -- |
+| `routing_changes` | Pre-change | fleet | Routes removed/added by proposed configs (branch only) | -- |
+
+Fleet-scoped checks produce one result per run (`device: null`) instead of one per device. The two pre-change checks require a branch (`requires_proposed`) and skip otherwise.
 
 ## Graph Checks (16)
 
@@ -143,4 +210,4 @@ Checks evaluate NetBox data server-side; parameters below are unchanged on NetBo
 | `bgp_session_criticality` | Routing* | BGP session prefix impact | `min_prefix_count: 10` |
 | `forwarding_path_redundancy` | Routing* | ECMP path count | `flow_pairs`, `min_paths: 2` |
 
-*Routing checks require config analysis engine at deployment level.*
+*Routing checks require the config engine's analysis service at deployment level.*
