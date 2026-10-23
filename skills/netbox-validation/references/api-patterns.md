@@ -21,6 +21,8 @@ curl -X POST "$NETBOX_URL/api/plugins/validation/policies/" \
 # Always confirm the scope landed: the response (or GET /policies/{id}/) must show
 # "sites": [1, 2], "roles": [3] — empty lists mean every active device is in scope.
 # trigger_on_cr_submit defaults to true on create; trigger_on_branch_merge to false.
+# Responses also carry read-only rules_count, next_scheduled_run, latest_run (never an inline
+# evaluation) and engines — the engines the rules actually use, which is how the UI labels a policy.
 
 # Update / Delete / Clone
 curl -X PATCH "$NETBOX_URL/api/plugins/validation/policies/1/" \
