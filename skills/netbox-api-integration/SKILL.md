@@ -263,7 +263,15 @@ Configure NetBox to push changes via webhooks. Always verify the `X-Hook-Signatu
 
 ### Change Tracking
 
-Query `extras.object_changes` for audit trails — includes timestamp, action, user, and before/after data.
+Query `core.object_changes` for audit trails — `GET /api/core/object-changes/` (pynetbox: `nb.core.object_changes`). Each record includes timestamp, action, user, and before/after data.
+
+Attach a `changelog_message` to write requests so the change record says why. It works on create, update, and delete, individually or in bulk (one per object in a bulk array):
+
+```bash
+curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  https://netbox.example.com/api/dcim/devices/42/ \
+  --data '{"status": "active", "changelog_message": "Activated per ticket #4137"}'
+```
 
 ## Branching (Plugin)
 
