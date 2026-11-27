@@ -120,6 +120,8 @@ Use lookup expressions for server-side filtering:
 | `__n` | `status__n=offline` | Not equal |
 | `cf_` prefix | `cf_environment=production` | Custom field filter |
 
+> **Unknown filters are silently ignored.** A misspelled filter name or unsupported lookup returns HTTP 200 with the unfiltered list. Validate filter names against the OpenAPI schema and check `count` before acting on a filtered list — see [Unknown Filters Are Ignored](references/rest-api-patterns.md#unknown-filters-are-ignored).
+
 See [references/rest-api-patterns.md](references/rest-api-patterns.md) for complete REST API reference including filtering expressions, field selection, ordering, nested serializers, OPTIONS discovery, and error handling.
 
 ## GraphQL Essentials
