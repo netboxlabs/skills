@@ -127,6 +127,9 @@ DeviceRole + Site + DeviceType → Device (with auto-created components)
 - **DeviceType** defines the hardware template: interface templates, power ports, module bays
 - Creating a Device auto-creates components from its DeviceType's templates
 - **Modules** extend devices: module types define additional component templates inserted into module bays
+- **Templates are copied once, at creation.** Components are instantiated only when the Device (or Module) is created. Changing a Device's `device_type` later does not add, remove, or rename components, and editing a DeviceType's templates does not touch existing devices. To correct a wrong type, delete and recreate the device before cables and IPs are attached; otherwise reconcile its components by hand (review check DEV-10 in [netbox-review-datamodel](../netbox-review-datamodel/SKILL.md))
+- **Name tokens resolve at instantiation.** `{module}` in a module type's component template becomes the installing bay's `position`, so bay positions end up in component names — a PSU module type whose power port template is just `{module}` names the port after the bay position. `{vc_position}` becomes the device's virtual chassis position (`0` outside a chassis, or `{vc_position:X}` for a custom default); set `virtual_chassis` and `vc_position` in the create request, because joining a chassis later does not rename existing components
+- **Deleting a module deletes its components**, together with the IP and MAC addresses assigned to their interfaces. On 4.7+ relocate the module instead (below)
 - **DeviceRole** (4.5: hierarchical) — use for config context matching and classification
 - **Platform** (4.5: hierarchical) — OS/firmware family; optionally tied to a Manufacturer
 - **Racks**: assign a **RackType** (Manufacturer → RackType → Rack) and put physical dimensions there. On 4.7 the per-rack `form_factor`, `width`, `outer_width/height/depth/unit` fields are **deprecated**; in 5.0 they are removed and `rack_type` becomes mandatory. `u_height`, `starting_unit`, `desc_units`, `mounting_depth` stay on the Rack.
@@ -135,7 +138,7 @@ DeviceRole + Site + DeviceType → Device (with auto-created components)
 
 > **NetBox 4.7+** device modeling additions (all optional; ignore on 4.5–4.6):
 > - **ModuleBayType** — allow-list of what fits where. M2M `module_bay_types` on ModuleBay, ModuleBayTemplate, and ModuleType. Installation is rejected only when *both* bay and module type declare types and share none; template types propagate to instantiated bays. Read-only `Module.is_bay_compatible` / `ModuleBay.is_module_compatible`.
-> - **Module relocation** — PATCH a Module's `module_bay` to move it (device derived from the bay); the module's subtree moves with it. Cross-device moves require no cables, IPs, VLANs, or other topology on the moved components.
+> - **Module relocation** — PATCH a Module's `module_bay` to move it (device derived from the bay); the module's subtree moves with it. Cross-device moves require no cables, IPs, VLANs, or other topology on the moved components. A moved component is renamed for its new bay only when its current name matches exactly one of the module type's templates (hand-renamed components keep their names), and a name that already exists on the destination rejects the move.
 > - **Channelized interfaces** — set `channels` (e.g. 4) on the physical parent; create one subinterface per channel with `parent` + `channel_id` (1-based) and type `channel` (or the real transceiver type). One cable terminates on the parent; NetBox traces a path per channel. Same fields on InterfaceTemplate. Don't model breakouts as ad-hoc virtual interfaces.
 > - **`end_of_life`** date on DeviceType/ModuleType — use for lifecycle planning instead of a custom field.
 > - **Cooling** — `cooling_method` (air/liquid/hybrid/immersion) on Device/DeviceType/ModuleType (device inherits from its type on create); `cooling_capability` (air-only/hybrid/liquid-only) + `cooling_capacity` (kW) on Rack/RackType (rack inherits from type). See §3a for full cooling topology.
@@ -257,6 +260,7 @@ See [references/dependency-order.md](references/dependency-order.md) for the com
 10. **Hardcoded PKs** — Use name/slug for lookups. PKs differ across environments.
 11. **Racks without a RackType** — Per-rack dimensions are deprecated in 4.7 and gone in 5.0. Define a RackType per physical model and assign it.
 12. **Cooling/lifecycle data in custom fields** *(4.7+)* — Use `cooling_method`, `cooling_capability`/`cooling_capacity`, `end_of_life`, and the cooling models instead of `cf_cooling`/`cf_eol`.
+13. **Fixing a wrong model by changing `device_type`** — The device keeps the old type's components. Recreate the device instead (before cables and IPs are attached).
 
 ## Version Notes
 

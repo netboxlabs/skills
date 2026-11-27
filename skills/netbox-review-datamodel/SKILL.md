@@ -73,6 +73,7 @@ Follow this checklist when auditing a NetBox data model:
 | DEV-7 | On 4.7+, model breakout/channelized ports with `channels` on the parent and `channel_id` subinterfaces (`channel` type), not as loose virtual interfaces or extra physical interfaces — otherwise cable paths and port counts are wrong | Medium |
 | DEV-8 | On 4.7+, use **Module Bay Types** where a chassis restricts which modules fit which slots (line-card vs supervisor vs fan bays) — an empty bay-type set means "anything fits", so absence is fine for simple hardware but flag chassis with mixed slot types and no bay types | Low |
 | DEV-9 | On 4.7+, record hardware lifecycle with `end_of_life` on Device Types/Module Types and cooling with `cooling_method` (Device/DeviceType) and `cooling_capability`/`cooling_capacity` (Rack/RackType) — flag custom fields (`cf_eol`, `cf_cooling`) duplicating these. Liquid-cooled halls should use CoolingSource → CoolingFeed → intake/outflow components, mirroring PowerPanel → PowerFeed | Medium |
+| DEV-10 | A Device's components must match its DeviceType — templates are copied only at creation, so a `device_type` changed afterwards (or templates edited later) leaves the old ports in place. Compare the names of components with no `module` against the type's templates, or as a quick screen the Device's `*_count` fields against the type's `*_template_count` (module components inflate the device counts). Flag mismatches; fix by recreating the device while it has no cables or IPs | High |
 
 ### Extensibility (EXT)
 
