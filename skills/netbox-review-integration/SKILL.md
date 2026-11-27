@@ -97,6 +97,7 @@ Follow this checklist when reviewing NetBox integration code:
 | DATA-7 | For read-modify-write on a single object under concurrency, use ETag + `If-Match` (4.6+); a 412 response means the object changed — re-fetch and retry rather than blind overwrite | Medium |
 | DATA-8 | On 4.7+, selection/multi-selection custom fields read as `{"value", "label"}` objects — flag `custom_fields["x"] == "raw"` comparisons and code that writes the read object back (fails validation); write the raw value | High |
 | DATA-9 | Services: use `port_mappings` (`["tcp/80"]`) over the deprecated `protocol`/`ports` pair on 4.7+ (removed in 5.0); flag `protocol__ic`-style and `port__empty` filters (gone in 4.7) | Medium |
+| DATA-10 | NetBox ignores unknown filter names and lookup suffixes and returns the unfiltered list with HTTP 200 — flag filtered reads that feed bulk PATCH/DELETE without resolving IDs and checking `count`, and hand-typed filter names not checked against the OpenAPI schema | High |
 
 ## Anti-Patterns to Flag
 

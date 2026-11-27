@@ -287,6 +287,29 @@ requests.get(f"{API_URL}/dcim/devices/?status=active&status=planned", headers=he
 | `__lt` | Less than | `vlan_id__lt=200` |
 | `__isnull` | Is null | `primary_ip4__isnull=false` |
 
+### Unknown Filters Are Ignored
+
+NetBox ignores query parameters it does not recognize. A misspelled filter name or an unsupported lookup suffix returns HTTP 200 with the **unfiltered** list. A valid filter with a value that does not exist returns 400 instead.
+
+| Request on `/api/dcim/interface-templates/` | Result |
+|---|---|
+| `?device_type_id=25` | 200 — that type's templates |
+| `?devicetype_id=25` (misspelled) | 200 — **every** interface template |
+| `?name__bogus=x` (no such lookup) | 200 — **every** interface template |
+| `?device_type_id=999999` | 400 — `Select a valid choice` |
+
+Validate filter names against the endpoint's parameters in the OpenAPI schema. Names do not always follow field names (`device_type_id`, not `devicetype_id`). The schema is large (~14 MB on 4.7.3) — fetch it once and cache it:
+
+```python
+schema = requests.get(f"{API_URL}/schema/?format=json", headers=headers).json()
+allowed = {p["name"] for p in schema["paths"]["/api/dcim/interface-templates/"]["get"]["parameters"]}
+unknown = set(filters) - allowed
+if unknown:
+    raise ValueError(f"Unknown filters: {sorted(unknown)}")
+```
+
+Never feed a filtered list straight into a bulk PATCH or DELETE. Resolve the IDs, check that `count` matches what you expect (a `count` equal to the unfiltered total means the filter was dropped), then act on those IDs.
+
 ### Custom Field Filters
 
 Use the `cf_` prefix:
